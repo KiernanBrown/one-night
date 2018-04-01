@@ -14,6 +14,7 @@
   "author": "Kiernan Brown",
   "license": "ISC",
   "dependencies": {
+    "mongoose": "^5.0.12",
     "socket.io": "^2.0.4",
     "victor": "^1.1.0",
     "xxhashjs": "^0.2.2"

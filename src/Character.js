@@ -1,5 +1,6 @@
 class Character {
-  constructor(hash) {
+  constructor(name, hash) {
+    this.name = name;
     this.hash = hash;
     this.lastUpdate = new Date().getTime();
     this.x = 100;
@@ -15,6 +16,8 @@ class Character {
     this.mouseX = 0;
     this.mouseY = 0;
     this.slashCooldown = 0;
+    this.alive = true;
+    this.score = 0;
   }
 }
 

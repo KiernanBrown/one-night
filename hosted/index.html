@@ -11,8 +11,17 @@
     <script src="bundle.js"></script>
 </head>
 <body>
+    <label id='usernameLabel' for="user">Username:</label>
+    <input id="username" name="user" type="text"/>
+    <br />
     <canvas id="canvas" height="600" width="600">Please use an HTML 5 browser</canvas>
     <canvas id="chatCanvas" height="600" width="200"></canvas>
-	<p>Use WASD to move around the screen. Your character will rotate to face your mouse. Left click to slash in the direction of your mouse and hit enemies. Your slash is is followed by a period of immobility. In this prototype there is a placeholder enemy on screen that you can attack, and your slash line will change to be red if the server registers your slash as hitting the enemy.</p>
+    <h1>Slash Slay Score</h1>
+	<p>Slash Slay Score is a four player game where you face waves of enemies and try to get the most kills to win. Join a game by entering a username and pressing the play button on the canvas. The game will automatically start once 4 players have joined your room. Fight through 5 waves of enemies and try to get the most kills in the game to win!</p>
+    <h3>Controls</h3>
+    <ul>
+      <li>Use WASD to move around the screen.</li>
+      <li>Your character will rotate to face your mouse. Left click to slash in the direction of your mouse and hit enemies. Your slash is is followed by a period of immobility.</li>
+    </ul>
 </body>
 </html>

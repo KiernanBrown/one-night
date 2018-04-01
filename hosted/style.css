@@ -22,3 +22,8 @@ p {
   left: 410px;
   top: 10px;
 }
+
+#usernameLabel {
+  margin-left: 10px;
+  font-size: 1.5em;
+}
