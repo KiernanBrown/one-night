@@ -9,197 +9,204 @@ var chatCtx = void 0;
 var socket = void 0;
 var hash = void 0;
 var user = '';
-var moveDown = false;
-var moveUp = false;
-var moveRight = false;
-var moveLeft = false;
 var prevTime = void 0;
-// let chatting = false;
+var chatting = false;
 var userChat = '';
-// let chatMessages = [];
-// let newMessages = [];
+var chatMessages = [];
+var newMessages = [];
 var roomName = '';
-
-var squares = {};
-var slashLines = {};
-var enemies = [];
+var tokens = [];
+var players = {};
 
 var inGame = false;
+var sleeping = false;
+var sleepObj = { x: 0, y: -600, prevX: 0, prevY: -600, destX: 0, destY: -600, alpha: 1.0 };
 
 var screenMessage = {};
-
-var update = function update(data) {
-  if (!squares[data.hash]) {
-    squares[data.hash] = data;
-    return;
-  }
-
-  // if we were using io.sockets.in or socket.emit
-  // to forcefully move this user back because of
-  // collision, error, invalid data, etc
-  /**
-  if(data.hash === hash) {
-    //force update user somehow
-    return;
-  } * */
-
-  var square = squares[data.hash];
-
-  if (square.lastUpdate >= data.lastUpdate) {
-    return;
-  }
-
-  square.lastUpdate = data.lastUpdate;
-  square.prevX = data.prevX;
-  square.prevY = data.prevY;
-  square.destX = data.destX;
-  square.destY = data.destY;
-  square.alpha = 0.05;
-  square.mouseX = data.mouseX;
-  square.mouseY = data.mouseY;
-  square.slashCooldown = data.slashCooldown;
-};
 
 var lerp = function lerp(v0, v1, alpha) {
   return (1 - alpha) * v0 + alpha * v1;
 };
 
-var updatePosition = function updatePosition(deltaTime) {
-  var square = squares[hash];
+var wrapText = function wrapText(chat, text, x, startY, width, lineHeight) {
+  // Code based on this tutorial:
+  // https://www.html5canvastutorials.com/tutorials/html5-canvas-wrap-text-tutorial/
+  var words = text.split(' ');
+  var line = '';
+  var y = startY;
 
-  if (square) {
-    square.prevX = square.x;
-    square.prevY = square.y;
-
-    if (square.slashCooldown <= 3) {
-      if (moveUp && square.destY > square.height / 2) {
-        square.destY -= 18 * deltaTime;
-      }
-      if (moveDown && square.destY < canvas.height - square.height / 2) {
-        square.destY += 18 * deltaTime;
-      }
-      if (moveLeft && square.destX > square.width / 2) {
-        square.destX -= 18 * deltaTime;
-      }
-      if (moveRight && square.destX < canvas.width - square.width / 2) {
-        square.destX += 18 * deltaTime;
-      }
+  // Loop through each word in our message
+  // Check if the line's width goes over when adding the line
+  for (var i = 0; i < words.length; i++) {
+    var testLine = '' + line + words[i] + ' ';
+    var lineWidth = chat.measureText(testLine).width;
+    if (lineWidth > width && i > 0) {
+      chat.fillText(line, x, y);
+      line = words[i] + ' ';
+      y += lineHeight;
+    } else {
+      line = testLine;
     }
-
-    // Reset our alpha since we are moving
-    square.alpha = 0.05;
-
-    // Emit a movementUpdate
-    socket.emit('movementUpdate', square);
   }
+  chat.fillText(line, x, y);
+  return y;
 };
 
-/* // Draw chat messages to the screen
-const drawChat = () => {
+// Draw chat messages to the screen
+var drawChat = function drawChat() {
+  // Draw the message the user is typing
+  var messageText = user + ': ' + userChat;
+  ctx.fillStyle = 'black';
+  ctx.font = '18px Helvetica';
+  ctx.fillText(messageText, 20, 20);
 
+  // Draw all chat messages on the side
+  chatCtx.fillStyle = 'black';
+  chatCtx.font = '18px Helvetica';
+  var currentY = 20;
+  for (var i = chatMessages.length - 1; i >= 0; i--) {
+    currentY = wrapText(chatCtx, chatMessages[i], 0, currentY, 200, 20) + 30;
+  }
 };
 
 // Draw any newly posted messages to the screen
-const drawNewMessages = () => {
-  for (let i = newMessages.length; i > 0; i--) {
-
+// Newly sent messages stay on screen for 5 seconds
+var drawNewMessages = function drawNewMessages() {
+  chatCtx.fillStyle = 'black';
+  chatCtx.font = '18px Helvetica';
+  var currentY = 20;
+  for (var i = newMessages.length - 1; i >= 0; i--) {
+    currentY = wrapText(chatCtx, newMessages[i], 0, currentY, 200, 20) + 30;
   }
-}; */
+};
+
+var drawPlayer = function drawPlayer(pHash, x, y) {
+  var p = players[pHash];
+
+  // Draw the player
+  // This will be updated to display in the player's color or their icon
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = 3;
+  ctx.fillStyle = 'rgba(200, 200, 200, 0.5)';
+  ctx.beginPath();
+  ctx.arc(x - 15, y - 15, 30, 0, Math.PI * 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Write the player's name under them
+  ctx.fillStyle = 'black';
+  ctx.font = '18px Helvetica';
+  ctx.fillText(p.name, x - ctx.measureText(p.name).width / 2 - 15, y + 40);
+};
+
+var drawPlayers = function drawPlayers() {
+  var keys = Object.keys(players);
+  var playerNum = keys.length;
+  switch (playerNum) {
+    case 1:
+      drawPlayer(hash, canvas.width / 2.0, canvas.height / 2.0);
+      break;
+    case 2:
+      drawPlayer(keys[0], canvas.width / 2.0, canvas.height / 2.0 - 150);
+      drawPlayer(keys[1], canvas.width / 2.0, canvas.height / 2.0 + 150);
+      break;
+    case 3:
+      drawPlayer(keys[0], canvas.width / 2.0, canvas.height / 2.0 - 150);
+      drawPlayer(keys[1], canvas.width / 2.0 + 150, canvas.height / 2.0 + 150);
+      drawPlayer(keys[2], canvas.width / 2.0 - 150, canvas.height / 2.0 + 150);
+      break;
+    case 4:
+      drawPlayer(keys[0], canvas.width / 2.0 - 150, canvas.height / 2.0 - 150);
+      drawPlayer(keys[1], canvas.width / 2.0 + 150, canvas.height / 2.0 - 150);
+      drawPlayer(keys[2], canvas.width / 2.0 + 150, canvas.height / 2.0 + 150);
+      drawPlayer(keys[3], canvas.width / 2.0 - 150, canvas.height / 2.0 + 150);
+      break;
+    case 5:
+      drawPlayer(keys[0], canvas.width / 2.0, canvas.height / 2.0 - 150);
+      drawPlayer(keys[1], canvas.width / 2.0 + 150, canvas.height / 2.0);
+      drawPlayer(keys[2], canvas.width / 2.0 + 80, canvas.height / 2.0 + 150);
+      drawPlayer(keys[3], canvas.width / 2.0 - 80, canvas.height / 2.0 + 150);
+      drawPlayer(keys[4], canvas.width / 2.0 - 150, canvas.height / 2.0);
+      break;
+    case 6:
+      drawPlayer(keys[0], canvas.width / 2.0 - 80, canvas.height / 2.0 - 150);
+      drawPlayer(keys[1], canvas.width / 2.0 + 80, canvas.height / 2.0 - 150);
+      drawPlayer(keys[2], canvas.width / 2.0 + 150, canvas.height / 2.0);
+      drawPlayer(keys[3], canvas.width / 2.0 + 80, canvas.height / 2.0 + 150);
+      drawPlayer(keys[4], canvas.width / 2.0 - 80, canvas.height / 2.0 + 150);
+      drawPlayer(keys[5], canvas.width / 2.0 - 150, canvas.height / 2.0);
+      break;
+    case 7:
+      drawPlayer(keys[0], canvas.width / 2.0, canvas.height / 2.0 - 190);
+      drawPlayer(keys[1], canvas.width / 2.0 + 130, canvas.height / 2.0 - 100);
+      drawPlayer(keys[2], canvas.width / 2.0 + 200, canvas.height / 2.0 + 50);
+      drawPlayer(keys[3], canvas.width / 2.0 + 80, canvas.height / 2.0 + 190);
+      drawPlayer(keys[4], canvas.width / 2.0 - 80, canvas.height / 2.0 + 190);
+      drawPlayer(keys[5], canvas.width / 2.0 - 200, canvas.height / 2.0 + 50);
+      drawPlayer(keys[6], canvas.width / 2.0 - 130, canvas.height / 2.0 - 100);
+      break;
+    case 8:
+      drawPlayer(keys[0], canvas.width / 2.0 - 75, canvas.height / 2.0 - 200);
+      drawPlayer(keys[1], canvas.width / 2.0 + 75, canvas.height / 2.0 - 200);
+      drawPlayer(keys[2], canvas.width / 2.0 + 200, canvas.height / 2.0 - 75);
+      drawPlayer(keys[3], canvas.width / 2.0 + 200, canvas.height / 2.0 + 75);
+      drawPlayer(keys[4], canvas.width / 2.0 + 75, canvas.height / 2.0 + 200);
+      drawPlayer(keys[5], canvas.width / 2.0 - 75, canvas.height / 2.0 + 200);
+      drawPlayer(keys[6], canvas.width / 2.0 - 200, canvas.height / 2.0 + 75);
+      drawPlayer(keys[7], canvas.width / 2.0 - 200, canvas.height / 2.0 - 75);
+      break;
+  }
+};
 
 var drawGame = function drawGame(deltaTime) {
-  // Draw the enemies
-  if (enemies.length > 0) {
-    ctx.fillStyle = 'red';
-    ctx.strokeStyle = 'black';
-    ctx.lineWidth = 3;
-    for (var i = 0; i < enemies.length; i++) {
-      var enemy = enemies[i];
-      if (enemy.alive) {
-        ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
-        ctx.strokeRect(enemy.x, enemy.y, enemy.width, enemy.height);
-      }
-    }
+  // Draw all the players in the game
+  drawPlayers();
+
+  // Draw add/remove player buttons
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = 3;
+  ctx.fillStyle = 'rgba(200, 200, 200, 0.5)';
+  if (Object.keys(players).length > 1) {
+    ctx.fillRect(0, 550, 80, 50);
+    ctx.strokeRect(0, 550, 80, 50);
+    ctx.font = '48px Helvetica';
+    ctx.fillStyle = 'black';
+    ctx.fillText('-', 40 - ctx.measureText('-').width / 2, 585);
   }
 
-  var keys = Object.keys(squares);
+  ctx.fillStyle = 'rgba(200, 200, 200, 0.5)';
+  if (Object.keys(players).length < 8) {
+    ctx.fillRect(80, 550, 80, 50);
+    ctx.strokeRect(80, 550, 80, 50);
+    ctx.font = '48px Helvetica';
+    ctx.fillStyle = 'black';
+    ctx.fillText('+', 120 - ctx.measureText('+').width / 2, 590);
+  }
 
-  // Sort our keys by lastUpdate
-  // More recently updated characters are drawn on top
-  // keys.sort((a, b) => squares[a].lastUpdate - squares[b].lastUpdate);
+  ctx.fillStyle = 'black';
+  ctx.font = '18px Helvetica';
+  ctx.fillText('Change Players:', 80 - ctx.measureText('Change Players:').width / 2, 540);
 
-  for (var _i = 0; _i < keys.length; _i++) {
-    var square = squares[keys[_i]];
+  // Draw our sleepObj
+  if (sleepObj.alpha < 1) sleepObj.alpha += deltaTime / 10;
+  sleepObj.y = lerp(sleepObj.prevY, sleepObj.destY, sleepObj.alpha);
+  ctx.fillStyle = 'black';
+  ctx.fillRect(sleepObj.x, sleepObj.y, 600, 600);
 
-    if (square.alive) {
-      if (square.alpha < 1) square.alpha += 0.05;
-      if (square.slashCooldown > 0) square.slashCooldown -= deltaTime;
+  if (chatting) drawChat();else if (newMessages.length > 0) drawNewMessages();
 
-      square.x = lerp(square.prevX, square.destX, square.alpha);
-      square.y = lerp(square.prevY, square.destY, square.alpha);
-
-      square.angle = Math.atan2(square.mouseX - square.x, -(square.mouseY - square.y));
-
-      if (slashLines[square.hash]) {
-        var slashLine = slashLines[square.hash];
-        slashLine.alpha -= deltaTime / 8;
-        if (square.slashCooldown <= 3 && slashLine.alpha !== 0) {
-          // Tell the server to remove the line
-          // socket.emit('slashLineRemove', slashLine);
-          slashLine.alpha = 0;
-          socket.emit('updatedSlashLine', slashLine);
-        } else {
-          slashLine.p2X = square.x;
-          slashLine.p2Y = square.y;
-
-          socket.emit('updatedSlashLine', slashLine);
-
-          // Draw the line
-          ctx.save();
-          ctx.setLineDash([5, 10]);
-          ctx.lineWidth = 4;
-          if (slashLine.hits.length > 0) ctx.strokeStyle = 'rgba(255, 0, 0, ' + slashLine.alpha + ')';else ctx.strokeStyle = 'rgba(0, 0, 0, ' + slashLine.alpha + ')';
-          ctx.beginPath();
-          ctx.moveTo(slashLine.p1X, slashLine.p1Y);
-          ctx.lineTo(slashLine.p2X, slashLine.p2Y);
-          ctx.stroke();
-          ctx.restore();
-        }
-      }
-
-      ctx.save();
-      ctx.translate(square.x, square.y);
-      ctx.rotate(square.angle);
-      var slashAlpha = 1 / (square.slashCooldown + 1) * 0.8;
-
-      if (square.hash === hash) {
-        ctx.fillStyle = 'rgba(0, 0, 255, ' + slashAlpha + ')';
-
-        // Draw a line in the direction you're facing
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
-        ctx.beginPath();
-        ctx.setLineDash([5, 10]);
-        ctx.moveTo(0, 0 - square.height / 2);
-        ctx.lineTo(0, 0 - square.height / 2 - 50);
-        ctx.stroke();
-      } else {
-        ctx.fillStyle = 'rgba(0, 0, 0, ' + slashAlpha + ')';
-      }
-      ctx.strokeStyle = 'black';
-      ctx.lineWidth = 3;
-
-      // Draw the triangle for the character
-      ctx.beginPath();
-      ctx.setLineDash([]);
-      ctx.moveTo(0, 0 - square.height / 2);
-      ctx.lineTo(0 + square.width / 2, 0 + square.height / 2);
-      ctx.lineTo(0 - square.width / 2, 0 + square.height / 2);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.restore();
-    }
+  // Sleep/Wake Up buttons
+  ctx.fillStyle = 'rgba(200, 200, 200, 0.5)';
+  ctx.fillRect(520, 550, 80, 50);
+  ctx.strokeRect(520, 550, 80, 50);
+  ctx.font = '24px Helvetica';
+  if (sleeping) {
+    ctx.fillStyle = 'white';
+    ctx.fillText('Wake', 560 - ctx.measureText('Wake').width / 2, 585);
+  } else {
+    ctx.fillStyle = 'black';
+    ctx.fillText('Sleep', 560 - ctx.measureText('Wake').width / 2, 585);
   }
 };
 
@@ -222,9 +229,9 @@ var redraw = function redraw(time) {
   prevTime = time;
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  chatCtx.clearRect(0, 0, chatCanvas.width, chatCanvas.height);
 
   if (inGame) {
-    updatePosition(deltaTime);
     drawGame(deltaTime);
   } else {
     drawMenu();
@@ -258,133 +265,61 @@ var redraw = function redraw(time) {
 
 var setUser = function setUser(data) {
   roomName = data.roomName;
-  var h = data.character.hash;
+  var h = data.hash;
   hash = h;
-  squares[hash] = data.character;
+  players[hash] = { name: data.name };
+};
+
+var addUser = function addUser(data) {
+  players[data.hash] = { name: data.name };
 };
 
 var removeUser = function removeUser(rHash) {
-  if (squares[rHash]) {
-    delete squares[rHash];
+  if (players[rHash]) {
+    delete players[rHash];
   }
 };
 
-/* const keyPressHandler = (e) => {
+var keyPressHandler = function keyPressHandler(e) {
   if (chatting) {
-    const keyPressed = e.which;
+    e.preventDefault();
+    var keyPressed = e.which;
 
-    userChat = `${userChat}${String.fromCharCode(keyPressed)}`;
-    console.dir(userChat);
+    userChat = '' + userChat + String.fromCharCode(keyPressed);
   }
-}; */
+};
 
 var keyDownHandler = function keyDownHandler(e) {
   if (inGame) {
     var keyPressed = e.which;
-    /* if (chatting) {
+    if (chatting) {
       if ((keyPressed === 8 || keyPressed === 46) && userChat.length > 0) {
+        e.preventDefault();
         userChat = userChat.substr(0, userChat.length - 1);
-        console.dir(userChat);
+        return;
       }
-    } else */
-    if (keyPressed === 87 || keyPressed === 38) {
-      // W OR UP
-      moveUp = true;
-    } else if (keyPressed === 65 || keyPressed === 37) {
-      // A OR LEFT
-      moveLeft = true;
-    } else if (keyPressed === 83 || keyPressed === 40) {
-      // S OR DOWN
-      moveDown = true;
-    } else if (keyPressed === 68 || keyPressed === 39) {
-      // D OR RIGHT
-      moveRight = true;
     }
 
-    /* if (keyPressed === 13) {
+    if (keyPressed === 13) {
+      e.preventDefault();
       // Enter starts or ends chat
       if (chatting) {
-        console.dir('Done chatting');
-        console.dir(userChat);
-         // Send the message to the server
-         userChat = '';
+        // Send the message to the server
+        if (userChat !== '') {
+          socket.emit('message', { sender: user, message: userChat, roomName: roomName });
+        }
+        userChat = '';
         chatting = false;
       } else {
         chatting = true;
       }
-    } */
-
-    // if one of these keys is down, let's cancel the browsers
-    // default action so the page doesn't try to scroll on the user
-    if (moveUp || moveDown || moveLeft || moveRight) {
-      e.preventDefault();
     }
-  }
-};
-
-var keyUpHandler = function keyUpHandler(e) {
-  var keyPressed = e.which;
-
-  if (keyPressed === 87 || keyPressed === 38) {
-    // W OR UP
-    moveUp = false;
-  } else if (keyPressed === 65 || keyPressed === 37) {
-    // A OR LEFT
-    moveLeft = false;
-  } else if (keyPressed === 83 || keyPressed === 40) {
-    // S OR DOWN
-    moveDown = false;
-  } else if (keyPressed === 68 || keyPressed === 39) {
-    // D OR RIGHT
-    moveRight = false;
   }
 };
 
 var mouseMoveHandler = function mouseMoveHandler(e) {
-  if (squares[hash]) {
-    var square = squares[hash];
-    square.mouseX = e.pageX - canvas.offsetLeft;
-    square.mouseY = e.pageY - canvas.offsetTop;
-
-    socket.emit('movementUpdate', square);
-  }
-};
-
-var slash = function slash(e) {
-  if (squares[hash]) {
-    var square = squares[hash];
-    if (square.slashCooldown <= 0) {
-      square.mouseX = e.pageX - canvas.offsetLeft;
-      square.mouseY = e.pageY - canvas.offsetTop;
-
-      var directionX = square.x - square.mouseX;
-      var directionY = square.y - square.mouseY;
-      var magnitude = Math.sqrt(Math.pow(directionX, 2) + Math.pow(directionY, 2));
-
-      var dX = directionX / magnitude;
-      var dY = directionY / magnitude;
-
-      // Move 180 units in the direciton of the mouse cursor
-      square.slashCooldown = 10;
-      square.destX -= dX * 180;
-      square.destY -= dY * 180;
-
-      // Create a slash line for the player
-      slashLines[square.hash] = {
-        hash: square.hash,
-        p1X: square.x,
-        p1Y: square.y,
-        p2X: square.x,
-        p2Y: square.y,
-        alpha: 1.0,
-        hits: [],
-        roomName: roomName
-      };
-
-      // Tell the server to add the slash line
-      socket.emit('slashLineCreated', slashLines[square.hash]);
-    }
-  }
+  /* square.mouseX = e.pageX - canvas.offsetLeft;
+  square.mouseY = e.pageY - canvas.offsetTop; */
 };
 
 var addScreenMessage = function addScreenMessage(data) {
@@ -394,6 +329,15 @@ var addScreenMessage = function addScreenMessage(data) {
     disappear: data.disappear,
     alpha: 1.0
   };
+};
+
+// Add a chat message to the client
+var addChatMessage = function addChatMessage(data) {
+  chatMessages.push(data);
+  newMessages.push(data);
+  setTimeout(function () {
+    newMessages.splice(newMessages.indexOf(data), 1);
+  }, 5000);
 };
 
 var connect = function connect() {
@@ -412,34 +356,50 @@ var connect = function connect() {
 
   socket.on('joined', setUser);
 
-  socket.on('updatedMovement', update);
-
   socket.on('left', removeUser);
 
-  socket.on('addLine', function (data) {
-    slashLines[data.hash] = data;
-  });
-
-  socket.on('updateEnemies', function (data) {
-    enemies = data;
-  });
-
-  socket.on('updateScore', function (data) {
-    squares[data.hash].score = data.score;
-  });
-
   socket.on('screenMessage', addScreenMessage);
+
+  socket.on('addPlayer', addUser);
+
+  socket.on('addMessage', addChatMessage);
 };
 
 var mouseClickHandler = function mouseClickHandler(e) {
-  if (inGame) slash(e);else {
-    var mouseX = e.pageX - canvas.offsetLeft;
-    var mouseY = e.pageY - canvas.offsetTop;
+  var mouseX = e.pageX - canvas.offsetLeft;
+  var mouseY = e.pageY - canvas.offsetTop;
 
+  if (!inGame) {
     if (mouseX >= 200 && mouseX <= 400) {
       if (mouseY >= 200 && mouseY <= 340) {
         inGame = true;
         connect();
+      }
+    }
+  } else {
+    if (mouseX >= 0 && mouseX < 80) {
+      if (mouseY >= 550 && mouseY <= 600) {
+        socket.emit('removePlayer', { roomName: roomName });
+      }
+    }
+    if (mouseX >= 80 && mouseX < 160) {
+      if (mouseY >= 550 && mouseY <= 600) {
+        if (Object.keys(players).length < 8) socket.emit('createPlayer', { roomName: roomName });
+      }
+    }
+    if (mouseX >= 520 && mouseX < 600) {
+      if (mouseY >= 550 && mouseY <= 600) {
+        if (!sleeping) {
+          sleeping = true;
+          sleepObj.alpha = 0;
+          sleepObj.destY = 0;
+          sleepObj.prevY = -600;
+        } else {
+          sleeping = false;
+          sleepObj.alpha = 0;
+          sleepObj.destY = -600;
+          sleepObj.prevY = 0;
+        }
       }
     }
   }
@@ -452,8 +412,7 @@ var init = function init() {
   chatCtx = chatCanvas.getContext('2d');
 
   document.body.addEventListener('keydown', keyDownHandler);
-  document.body.addEventListener('keyup', keyUpHandler);
-  // document.body.addEventListener('keypress', keyPressHandler);
+  document.body.addEventListener('keypress', keyPressHandler);
   canvas.addEventListener('mousemove', mouseMoveHandler);
   canvas.addEventListener('click', mouseClickHandler);
   chatCanvas.addEventListener('mousemove', mouseMoveHandler);

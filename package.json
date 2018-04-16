@@ -1,7 +1,7 @@
 {
-  "name": "syncing-data-ii",
+  "name": "rt-project3",
   "version": "0.0.0",
-  "description": "Syncing Data II assignment.",
+  "description": "Real Time Project 3",
   "main": "./src/app.js",
   "scripts": {
     "start": "node ./src/app.js",

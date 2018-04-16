@@ -12,6 +12,12 @@ const PlayerSchema = new mongoose.Schema({
     unique: true,
   },
 
+  gamesPlayed: {
+    type: Number,
+    min: 0,
+    required: true,
+  },
+
   wins: {
     type: Number,
     min: 0,
