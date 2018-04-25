@@ -17,10 +17,20 @@ var newMessages = [];
 var roomName = '';
 var tokens = [];
 var players = {};
+var canAct = false;
+var unusedRoles = [];
 
 var inGame = false;
 var sleeping = false;
-var sleepObj = { x: 0, y: -600, prevX: 0, prevY: -600, destX: 0, destY: -600, alpha: 1.0 };
+var sleepObj = {
+  x: 0,
+  y: -800,
+  prevX: 0,
+  prevY: -800,
+  destX: 0,
+  destY: -800,
+  alpha: 1.0
+};
 
 var screenMessage = {};
 
@@ -53,6 +63,16 @@ var wrapText = function wrapText(chat, text, x, startY, width, lineHeight) {
 };
 
 // Draw chat messages to the screen
+var drawMessages = function drawMessages() {
+  // Draw all chat messages on the side
+  chatCtx.fillStyle = 'black';
+  chatCtx.font = '18px Helvetica';
+  var currentY = 20;
+  for (var i = chatMessages.length - 1; i >= 0; i--) {
+    currentY = wrapText(chatCtx, chatMessages[i], 2, currentY, 300, 20) + 30;
+  }
+};
+
 var drawChat = function drawChat() {
   // Draw the message the user is typing
   var messageText = user + ': ' + userChat;
@@ -60,13 +80,7 @@ var drawChat = function drawChat() {
   ctx.font = '18px Helvetica';
   ctx.fillText(messageText, 20, 20);
 
-  // Draw all chat messages on the side
-  chatCtx.fillStyle = 'black';
-  chatCtx.font = '18px Helvetica';
-  var currentY = 20;
-  for (var i = chatMessages.length - 1; i >= 0; i--) {
-    currentY = wrapText(chatCtx, chatMessages[i], 0, currentY, 200, 20) + 30;
-  }
+  drawMessages();
 };
 
 // Draw any newly posted messages to the screen
@@ -76,86 +90,92 @@ var drawNewMessages = function drawNewMessages() {
   chatCtx.font = '18px Helvetica';
   var currentY = 20;
   for (var i = newMessages.length - 1; i >= 0; i--) {
-    currentY = wrapText(chatCtx, newMessages[i], 0, currentY, 200, 20) + 30;
+    currentY = wrapText(chatCtx, newMessages[i], 2, currentY, 300, 20) + 30;
   }
 };
 
-var drawPlayer = function drawPlayer(pHash, x, y) {
+var setPosition = function setPosition(pHash, x, y) {
   var p = players[pHash];
+
+  p.x = x;
+  p.y = y + 100;
+};
+
+var drawRoundRect = function drawRoundRect(x, y, size, cornerRadius) {
+  ctx.beginPath();
+  ctx.moveTo(x - size + cornerRadius, y - size);
+  ctx.lineTo(x + size - cornerRadius, y - size);
+  ctx.arcTo(x + size, y - size, x + size, y - size + cornerRadius, cornerRadius);
+  ctx.lineTo(x + size, y + size - cornerRadius);
+  ctx.arcTo(x + size, y + size, x + size - cornerRadius, y + size, cornerRadius);
+  ctx.lineTo(x - size + cornerRadius, y + size);
+  ctx.arcTo(x - size, y + size, x - size, y + size - cornerRadius, cornerRadius);
+  ctx.lineTo(x - size, y - size + cornerRadius);
+  ctx.arcTo(x - size, y - size, x - size + cornerRadius, y - size, cornerRadius);
+};
+
+var drawRoleCard = function drawRoleCard(x, y, role, flipped) {
+  if (!flipped) {
+    ctx.fillStyle = 'rgba(170, 170, 170, 0.6)';
+    drawRoundRect(x, y, 45, 4);
+    ctx.fill();
+    ctx.stroke();
+  } else {
+    if (role === 'Villager' || role === 'Seer' || role === 'Robber' || role === 'Revealer' || role === 'Insomniac') ctx.fillStyle = 'rgba(125, 168, 237, 0.8)';else if (role === 'Werewolf') ctx.fillStyle = 'rgba(193, 62, 42, 0.8)';else ctx.fillStyle = 'rgba(140, 140, 140, 0.8)';
+
+    var cardText = role.substring(0, 3);
+    drawRoundRect(x, y, 45, 4);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = 'black';
+    ctx.font = '20px Helvetica';
+    ctx.fillText(cardText, x - ctx.measureText(cardText).width / 2, y - 10);
+  }
+};
+
+var drawPlayer = function drawPlayer(pHash) {
+  var p = players[pHash];
+
+  // Draw the card of the player
+  // Rounded rectangle tutorial: https://www.html5canvastutorials.com/tutorials/html5-canvas-rounded-corners/
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = 3;
+  if (!p.flipped) {
+    drawRoleCard(p.x, p.y, p.role, p.flipped);
+  }
 
   // Draw the player
   // This will be updated to display in the player's color or their icon
-  ctx.strokeStyle = 'black';
-  ctx.lineWidth = 3;
-  ctx.fillStyle = 'rgba(200, 200, 200, 0.5)';
+  ctx.fillStyle = 'rgba(240, 240, 240, 1.0)';
   ctx.beginPath();
-  ctx.arc(x - 15, y - 15, 30, 0, Math.PI * 2);
+  ctx.arc(p.x, p.y, 30, 0, Math.PI * 2);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
 
+  // If a player's card has been flipped, we display it on top of them
+  if (p.flipped) {
+    drawRoleCard(p.x, p.y, p.role, p.flipped);
+  }
+
   // Write the player's name under them
   ctx.fillStyle = 'black';
   ctx.font = '18px Helvetica';
-  ctx.fillText(p.name, x - ctx.measureText(p.name).width / 2 - 15, y + 40);
+  ctx.fillText(p.name, p.x - ctx.measureText(p.name).width / 2, p.y + 62);
 };
 
 var drawPlayers = function drawPlayers() {
   var keys = Object.keys(players);
-  var playerNum = keys.length;
-  switch (playerNum) {
-    case 1:
-      drawPlayer(hash, canvas.width / 2.0, canvas.height / 2.0);
-      break;
-    case 2:
-      drawPlayer(keys[0], canvas.width / 2.0, canvas.height / 2.0 - 150);
-      drawPlayer(keys[1], canvas.width / 2.0, canvas.height / 2.0 + 150);
-      break;
-    case 3:
-      drawPlayer(keys[0], canvas.width / 2.0, canvas.height / 2.0 - 150);
-      drawPlayer(keys[1], canvas.width / 2.0 + 150, canvas.height / 2.0 + 150);
-      drawPlayer(keys[2], canvas.width / 2.0 - 150, canvas.height / 2.0 + 150);
-      break;
-    case 4:
-      drawPlayer(keys[0], canvas.width / 2.0 - 150, canvas.height / 2.0 - 150);
-      drawPlayer(keys[1], canvas.width / 2.0 + 150, canvas.height / 2.0 - 150);
-      drawPlayer(keys[2], canvas.width / 2.0 + 150, canvas.height / 2.0 + 150);
-      drawPlayer(keys[3], canvas.width / 2.0 - 150, canvas.height / 2.0 + 150);
-      break;
-    case 5:
-      drawPlayer(keys[0], canvas.width / 2.0, canvas.height / 2.0 - 150);
-      drawPlayer(keys[1], canvas.width / 2.0 + 150, canvas.height / 2.0);
-      drawPlayer(keys[2], canvas.width / 2.0 + 80, canvas.height / 2.0 + 150);
-      drawPlayer(keys[3], canvas.width / 2.0 - 80, canvas.height / 2.0 + 150);
-      drawPlayer(keys[4], canvas.width / 2.0 - 150, canvas.height / 2.0);
-      break;
-    case 6:
-      drawPlayer(keys[0], canvas.width / 2.0 - 80, canvas.height / 2.0 - 150);
-      drawPlayer(keys[1], canvas.width / 2.0 + 80, canvas.height / 2.0 - 150);
-      drawPlayer(keys[2], canvas.width / 2.0 + 150, canvas.height / 2.0);
-      drawPlayer(keys[3], canvas.width / 2.0 + 80, canvas.height / 2.0 + 150);
-      drawPlayer(keys[4], canvas.width / 2.0 - 80, canvas.height / 2.0 + 150);
-      drawPlayer(keys[5], canvas.width / 2.0 - 150, canvas.height / 2.0);
-      break;
-    case 7:
-      drawPlayer(keys[0], canvas.width / 2.0, canvas.height / 2.0 - 190);
-      drawPlayer(keys[1], canvas.width / 2.0 + 130, canvas.height / 2.0 - 100);
-      drawPlayer(keys[2], canvas.width / 2.0 + 200, canvas.height / 2.0 + 50);
-      drawPlayer(keys[3], canvas.width / 2.0 + 80, canvas.height / 2.0 + 190);
-      drawPlayer(keys[4], canvas.width / 2.0 - 80, canvas.height / 2.0 + 190);
-      drawPlayer(keys[5], canvas.width / 2.0 - 200, canvas.height / 2.0 + 50);
-      drawPlayer(keys[6], canvas.width / 2.0 - 130, canvas.height / 2.0 - 100);
-      break;
-    case 8:
-      drawPlayer(keys[0], canvas.width / 2.0 - 75, canvas.height / 2.0 - 200);
-      drawPlayer(keys[1], canvas.width / 2.0 + 75, canvas.height / 2.0 - 200);
-      drawPlayer(keys[2], canvas.width / 2.0 + 200, canvas.height / 2.0 - 75);
-      drawPlayer(keys[3], canvas.width / 2.0 + 200, canvas.height / 2.0 + 75);
-      drawPlayer(keys[4], canvas.width / 2.0 + 75, canvas.height / 2.0 + 200);
-      drawPlayer(keys[5], canvas.width / 2.0 - 75, canvas.height / 2.0 + 200);
-      drawPlayer(keys[6], canvas.width / 2.0 - 200, canvas.height / 2.0 + 75);
-      drawPlayer(keys[7], canvas.width / 2.0 - 200, canvas.height / 2.0 - 75);
-      break;
+  for (var i = 0; i < keys.length; i++) {
+    drawPlayer(keys[i]);
+  }
+};
+
+var drawUnusedRoles = function drawUnusedRoles() {
+  if (unusedRoles.length > 0) {
+    drawRoleCard(unusedRoles[0].x, unusedRoles[0].y, unusedRoles[0].role, unusedRoles[0].flipped);
+    drawRoleCard(unusedRoles[1].x, unusedRoles[1].y, unusedRoles[1].role, unusedRoles[1].flipped);
+    drawRoleCard(unusedRoles[2].x, unusedRoles[2].y, unusedRoles[2].role, unusedRoles[2].flipped);
   }
 };
 
@@ -163,56 +183,25 @@ var drawGame = function drawGame(deltaTime) {
   // Draw all the players in the game
   drawPlayers();
 
-  // Draw add/remove player buttons
-  ctx.strokeStyle = 'black';
-  ctx.lineWidth = 3;
-  ctx.fillStyle = 'rgba(200, 200, 200, 0.5)';
-  if (Object.keys(players).length > 1) {
-    ctx.fillRect(0, 550, 80, 50);
-    ctx.strokeRect(0, 550, 80, 50);
-    ctx.font = '48px Helvetica';
-    ctx.fillStyle = 'black';
-    ctx.fillText('-', 40 - ctx.measureText('-').width / 2, 585);
-  }
-
-  ctx.fillStyle = 'rgba(200, 200, 200, 0.5)';
-  if (Object.keys(players).length < 8) {
-    ctx.fillRect(80, 550, 80, 50);
-    ctx.strokeRect(80, 550, 80, 50);
-    ctx.font = '48px Helvetica';
-    ctx.fillStyle = 'black';
-    ctx.fillText('+', 120 - ctx.measureText('+').width / 2, 590);
-  }
-
-  ctx.fillStyle = 'black';
-  ctx.font = '18px Helvetica';
-  ctx.fillText('Change Players:', 80 - ctx.measureText('Change Players:').width / 2, 540);
+  // Draw the 3 unused Roles
+  drawUnusedRoles();
 
   // Draw our sleepObj
-  if (sleepObj.alpha < 1) sleepObj.alpha += deltaTime / 10;
-  sleepObj.y = lerp(sleepObj.prevY, sleepObj.destY, sleepObj.alpha);
-  ctx.fillStyle = 'black';
-  ctx.fillRect(sleepObj.x, sleepObj.y, 600, 600);
-
-  if (chatting) drawChat();else if (newMessages.length > 0) drawNewMessages();
-
-  // Sleep/Wake Up buttons
-  ctx.fillStyle = 'rgba(200, 200, 200, 0.5)';
-  ctx.fillRect(520, 550, 80, 50);
-  ctx.strokeRect(520, 550, 80, 50);
-  ctx.font = '24px Helvetica';
-  if (sleeping) {
-    ctx.fillStyle = 'white';
-    ctx.fillText('Wake', 560 - ctx.measureText('Wake').width / 2, 585);
+  if (sleepObj.alpha < 1) {
+    sleepObj.alpha += deltaTime / 10;
+    sleepObj.y = lerp(sleepObj.prevY, sleepObj.destY, sleepObj.alpha);
   } else {
-    ctx.fillStyle = 'black';
-    ctx.fillText('Sleep', 560 - ctx.measureText('Wake').width / 2, 585);
+    sleepObj.y = sleepObj.destY;
   }
+  ctx.fillStyle = 'black';
+  ctx.fillRect(sleepObj.x, sleepObj.y, 600, 800);
+
+  if (chatting) drawChat();else drawMessages();
+  // if (chatting) drawChat();
+  // else if (newMessages.length > 0) drawNewMessages();
 };
 
 var drawMenu = function drawMenu() {
-  // Draw objects for our top 3 players
-
   // Draw our play button
   ctx.strokeStyle = 'black';
   ctx.lineWidth = 5;
@@ -241,7 +230,7 @@ var redraw = function redraw(time) {
     if (screenMessage.alpha > 0) {
       if (screenMessage.disappear) {
         // Reduce the alpha if this message disappears
-        screenMessage.alpha -= 0.005;
+        screenMessage.alpha -= 0.003;
       }
 
       // Draw the message to the screen
@@ -249,13 +238,13 @@ var redraw = function redraw(time) {
       ctx.font = '32px Helvetica';
       ctx.fillStyle = 'rgba(0, 0, 0, ' + screenMessage.alpha + ')';
       var textX = 300 - ctx.measureText(screenMessage.message).width / 2;
-      ctx.fillText(screenMessage.message, textX, 270);
+      ctx.fillText(screenMessage.message, textX, 200);
 
       if (screenMessage.submessage) {
         ctx.font = '24px Helvetica';
         ctx.fillStyle = 'rgba(0, 0, 0, ' + screenMessage.alpha + ')';
         var subtextX = 300 - ctx.measureText(screenMessage.submessage).width / 2;
-        ctx.fillText(screenMessage.submessage, subtextX, 320);
+        ctx.fillText(screenMessage.submessage, subtextX, 240);
       }
     }
   }
@@ -263,21 +252,88 @@ var redraw = function redraw(time) {
   requestAnimationFrame(redraw);
 };
 
+var setPlayerPositions = function setPlayerPositions() {
+  var keys = Object.keys(players);
+  switch (keys.length) {
+    case 1:
+      setPosition(keys[0], canvas.width / 2.0, canvas.height / 2.0);
+      break;
+    case 2:
+      setPosition(keys[0], canvas.width / 2.0, canvas.height / 2.0 - 150);
+      setPosition(keys[1], canvas.width / 2.0, canvas.height / 2.0 + 150);
+      break;
+    case 3:
+      setPosition(keys[0], canvas.width / 2.0, canvas.height / 2.0 - 150);
+      setPosition(keys[1], canvas.width / 2.0 + 150, canvas.height / 2.0 + 150);
+      setPosition(keys[2], canvas.width / 2.0 - 150, canvas.height / 2.0 + 150);
+      break;
+    case 4:
+      setPosition(keys[0], canvas.width / 2.0 - 150, canvas.height / 2.0 - 150);
+      setPosition(keys[1], canvas.width / 2.0 + 150, canvas.height / 2.0 - 150);
+      setPosition(keys[2], canvas.width / 2.0 + 150, canvas.height / 2.0 + 150);
+      setPosition(keys[3], canvas.width / 2.0 - 150, canvas.height / 2.0 + 150);
+      break;
+    case 5:
+      setPosition(keys[0], canvas.width / 2.0, canvas.height / 2.0 - 150);
+      setPosition(keys[1], canvas.width / 2.0 + 150, canvas.height / 2.0);
+      setPosition(keys[2], canvas.width / 2.0 + 80, canvas.height / 2.0 + 150);
+      setPosition(keys[3], canvas.width / 2.0 - 80, canvas.height / 2.0 + 150);
+      setPosition(keys[4], canvas.width / 2.0 - 150, canvas.height / 2.0);
+      break;
+    case 6:
+      setPosition(keys[0], canvas.width / 2.0 - 80, canvas.height / 2.0 - 150);
+      setPosition(keys[1], canvas.width / 2.0 + 80, canvas.height / 2.0 - 150);
+      setPosition(keys[2], canvas.width / 2.0 + 150, canvas.height / 2.0);
+      setPosition(keys[3], canvas.width / 2.0 + 80, canvas.height / 2.0 + 150);
+      setPosition(keys[4], canvas.width / 2.0 - 80, canvas.height / 2.0 + 150);
+      setPosition(keys[5], canvas.width / 2.0 - 150, canvas.height / 2.0);
+      break;
+    case 7:
+      setPosition(keys[0], canvas.width / 2.0, canvas.height / 2.0 - 190);
+      setPosition(keys[1], canvas.width / 2.0 + 130, canvas.height / 2.0 - 100);
+      setPosition(keys[2], canvas.width / 2.0 + 200, canvas.height / 2.0 + 50);
+      setPosition(keys[3], canvas.width / 2.0 + 80, canvas.height / 2.0 + 190);
+      setPosition(keys[4], canvas.width / 2.0 - 80, canvas.height / 2.0 + 190);
+      setPosition(keys[5], canvas.width / 2.0 - 200, canvas.height / 2.0 + 50);
+      setPosition(keys[6], canvas.width / 2.0 - 130, canvas.height / 2.0 - 100);
+      break;
+    case 8:
+      setPosition(keys[0], canvas.width / 2.0 - 75, canvas.height / 2.0 - 200);
+      setPosition(keys[1], canvas.width / 2.0 + 75, canvas.height / 2.0 - 200);
+      setPosition(keys[2], canvas.width / 2.0 + 200, canvas.height / 2.0 - 75);
+      setPosition(keys[3], canvas.width / 2.0 + 200, canvas.height / 2.0 + 75);
+      setPosition(keys[4], canvas.width / 2.0 + 75, canvas.height / 2.0 + 200);
+      setPosition(keys[5], canvas.width / 2.0 - 75, canvas.height / 2.0 + 200);
+      setPosition(keys[6], canvas.width / 2.0 - 200, canvas.height / 2.0 + 75);
+      setPosition(keys[7], canvas.width / 2.0 - 200, canvas.height / 2.0 - 75);
+      break;
+  }
+};
+
 var setUser = function setUser(data) {
   roomName = data.roomName;
+
   var h = data.hash;
   hash = h;
   players[hash] = { name: data.name };
 };
 
 var addUser = function addUser(data) {
-  players[data.hash] = { name: data.name };
+  players[data.hash] = { name: data.name, hash: data.hash };
+  setPlayerPositions();
+};
+
+var setPlayers = function setPlayers(data) {
+  players = data.players;
+
+  setPlayerPositions();
 };
 
 var removeUser = function removeUser(rHash) {
   if (players[rHash]) {
     delete players[rHash];
   }
+  setPlayerPositions();
 };
 
 var keyPressHandler = function keyPressHandler(e) {
@@ -317,10 +373,10 @@ var keyDownHandler = function keyDownHandler(e) {
   }
 };
 
-var mouseMoveHandler = function mouseMoveHandler(e) {
-  /* square.mouseX = e.pageX - canvas.offsetLeft;
-  square.mouseY = e.pageY - canvas.offsetTop; */
-};
+/* const mouseMoveHandler = (e) => {
+  square.mouseX = e.pageX - canvas.offsetLeft;
+  square.mouseY = e.pageY - canvas.offsetTop;
+}; */
 
 var addScreenMessage = function addScreenMessage(data) {
   screenMessage = {
@@ -340,8 +396,61 @@ var addChatMessage = function addChatMessage(data) {
   }, 5000);
 };
 
-var connect = function connect() {
+var sleep = function sleep() {
+  sleeping = true;
+  sleepObj.alpha = 0;
+  sleepObj.destY = 0;
+  sleepObj.prevY = -800;
+  for (var i = 0; i < unusedRoles.length; i++) {
+    unusedRoles[i].flipped = false;
+  }
+};
 
+var wake = function wake() {
+  sleeping = false;
+  sleepObj.alpha = 0;
+  sleepObj.destY = -800;
+  sleepObj.prevY = 0;
+};
+
+var flip = function flip(data) {
+  var p = players[data.hash];
+  p.flipped = data.flipped;
+};
+
+var flipAll = function flipAll(data) {
+  var keys = Object.keys(players);
+  for (var i = 0; i < keys.length; i++) {
+    flip({ hash: keys[i], flipped: data.flipped });
+  }
+};
+
+var setStartRole = function setStartRole(data) {
+  var p = players[data.hash];
+  p.startRole = data.role;
+  p.role = data.role;
+};
+
+var setRole = function setRole(data) {
+  var p = players[data.hash];
+  p.role = data.role;
+};
+
+var setUnusedRoles = function setUnusedRoles(data) {
+  var roles = data.roles;
+
+  for (var i = 0; i < roles.length; i++) {
+    var x = canvas.width / 4 * (i + 1);
+    unusedRoles.push({
+      role: roles[i],
+      flipped: false,
+      x: x,
+      y: 100
+    });
+  }
+};
+
+var connect = function connect() {
   socket = io.connect();
 
   socket.on('connect', function () {
@@ -362,7 +471,88 @@ var connect = function connect() {
 
   socket.on('addPlayer', addUser);
 
+  socket.on('setPlayers', setPlayers);
+
   socket.on('addMessage', addChatMessage);
+
+  socket.on('sleep', sleep);
+
+  socket.on('wake', wake);
+
+  socket.on('flip', flip);
+
+  socket.on('flipAll', flipAll);
+
+  socket.on('setStartRole', setStartRole);
+
+  socket.on('setRole', setRole);
+
+  socket.on('setUnusedRoles', setUnusedRoles);
+
+  socket.on('changeAct', function (data) {
+    canAct = data;
+  });
+};
+
+var handleAction = function handleAction(clickedObj) {
+  if (!canAct) return;
+  if (players[hash].startRole === 'Werewolf') {
+    if (clickedObj.hash || !clickedObj.role) return;
+
+    canAct = false;
+    unusedRoles[unusedRoles.indexOf(clickedObj)].flipped = true;
+    clickedObj.flipped = true;
+  }
+  if (players[hash].startRole === 'Seer') {
+    if (clickedObj.hash) {
+      canAct = false;
+      clickedObj.flipped = true;
+    }
+  }
+  if (players[hash].startRole === 'Robber') {
+    if (!clickedObj.hash) return;
+
+    canAct = false;
+    socket.emit('changeRole', { roomName: roomName, hash: hash, newRole: clickedObj.role });
+    socket.emit('changeRole', { roomName: roomName, hash: clickedObj.hash, newRole: 'Robber' });
+    flip({ hash: hash, flipped: true });
+  }
+  if (players[hash].startRole === 'Revealer') {
+    if (!clickedObj.hash) return;
+
+    canAct = false;
+    if (clickedObj.role === 'Tanner' || clickedObj.role === 'Werewolf') {
+      addScreenMessage({ message: 'The card could not be flipped!', submessage: 'This player is a Tanner or a Werewolf.' });
+    } else {
+      var pHash = clickedObj.hash;
+      socket.emit('revealerFlip', { roomName: roomName, hash: pHash });
+    }
+  }
+};
+
+var checkPlayerClick = function checkPlayerClick(mX, mY) {
+  var keys = Object.keys(players);
+  for (var i = 0; i < keys.length; i++) {
+    var player = players[keys[i]];
+    if (mX >= player.x - 30 && mX <= player.x + 30) {
+      if (mY >= player.y - 30 && mY <= player.y + 30) {
+        return player;
+      }
+    }
+  }
+  return {};
+};
+
+var checkRoleClick = function checkRoleClick(mX, mY) {
+  for (var i = 0; i < unusedRoles.length; i++) {
+    var card = unusedRoles[i];
+    if (mX >= card.x - 50 && mX <= card.x + 50) {
+      if (mY >= card.y - 50 && mY <= card.y + 50) {
+        return card;
+      }
+    }
+  }
+  return {};
 };
 
 var mouseClickHandler = function mouseClickHandler(e) {
@@ -377,30 +567,11 @@ var mouseClickHandler = function mouseClickHandler(e) {
       }
     }
   } else {
-    if (mouseX >= 0 && mouseX < 80) {
-      if (mouseY >= 550 && mouseY <= 600) {
-        socket.emit('removePlayer', { roomName: roomName });
-      }
-    }
-    if (mouseX >= 80 && mouseX < 160) {
-      if (mouseY >= 550 && mouseY <= 600) {
-        if (Object.keys(players).length < 8) socket.emit('createPlayer', { roomName: roomName });
-      }
-    }
-    if (mouseX >= 520 && mouseX < 600) {
-      if (mouseY >= 550 && mouseY <= 600) {
-        if (!sleeping) {
-          sleeping = true;
-          sleepObj.alpha = 0;
-          sleepObj.destY = 0;
-          sleepObj.prevY = -600;
-        } else {
-          sleeping = false;
-          sleepObj.alpha = 0;
-          sleepObj.destY = -600;
-          sleepObj.prevY = 0;
-        }
-      }
+    if (canAct) {
+      var clickedPlayer = checkPlayerClick(mouseX, mouseY);
+      if (clickedPlayer) handleAction(clickedPlayer);
+      var clickedRole = checkRoleClick(mouseX, mouseY);
+      if (clickedRole) handleAction(clickedRole);
     }
   }
 };
@@ -413,9 +584,9 @@ var init = function init() {
 
   document.body.addEventListener('keydown', keyDownHandler);
   document.body.addEventListener('keypress', keyPressHandler);
-  canvas.addEventListener('mousemove', mouseMoveHandler);
+  // canvas.addEventListener('mousemove', mouseMoveHandler);
   canvas.addEventListener('click', mouseClickHandler);
-  chatCanvas.addEventListener('mousemove', mouseMoveHandler);
+  // chatCanvas.addEventListener('mousemove', mouseMoveHandler);
   chatCanvas.addEventListener('click', mouseClickHandler);
 
   requestAnimationFrame(redraw);

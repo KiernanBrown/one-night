@@ -68,6 +68,8 @@ app.listen(PORT);
 // Array of rooms that exist on our server
 // Each room has roomName, joinable, users, chatMessages
 const rooms = [];
+const roomTimeouts = [];
+// const roomIntervals = [];
 let roomCount = 0; // Number of rooms created since the server started
 
 const createNewRoom = () => {
@@ -77,6 +79,7 @@ const createNewRoom = () => {
     joinable: true,
     running: false,
     users: {},
+    roles: ['Villager', 'Villager', 'Seer', 'Robber', 'Insomniac', 'Revealer', 'Werewolf', 'Werewolf', 'Tanner'],
     chatMessages: [],
   };
 
@@ -84,7 +87,30 @@ const createNewRoom = () => {
   return rooms[rooms.indexOf(roomObj)];
 };
 
-/* const getBestRoom = () => {
+const assignRoles = (r) => {
+  const room = r;
+  const availableRoles = room.roles.slice(0, room.roles.length);
+  const { users } = room;
+  const keys = Object.keys(users);
+
+  // Give each user a role
+  for (let i = 0; i < keys.length; i++) {
+    const role = availableRoles[Math.floor(Math.random() * availableRoles.length)];
+    users[keys[i]].startRole = role;
+    users[keys[i]].role = role;
+    availableRoles.splice(availableRoles.indexOf(role), 1);
+    io.sockets.in(room.roomName).emit('setStartRole', { hash: keys[i], role });
+  }
+
+  // The 3 available roles become the 3 card roles
+  room.cardRoles = availableRoles;
+
+  io.sockets.in(room.roomName).emit('setUnusedRoles', { roles: room.cardRoles });
+
+  console.dir(users);
+};
+
+const getBestRoom = () => {
   let bestRoom;
   let userCount = -1;
 
@@ -111,7 +137,7 @@ const createNewRoom = () => {
     const checkRoom = rooms[i];
     if (checkRoom.joinable) {
       const keys = Object.keys(checkRoom.users);
-      if (keys.length < 4 && keys.length > userCount) {
+      if (keys.length < 6 && keys.length > userCount) {
         userCount = keys.length;
         bestRoom = checkRoom;
       }
@@ -121,13 +147,189 @@ const createNewRoom = () => {
   if (!bestRoom) return createNewRoom();
 
   return bestRoom;
-}; */
+};
 
 const getRoom = (rName) => {
   for (let i = 0; i < rooms.length; i++) {
     if (rooms[i].roomName === rName) return rooms[i];
   }
   return null;
+};
+
+// Function to decrease the timer by 1
+/* const decreaseTimer = (r) => {
+  const room = r;
+  room.timer--;
+  io.sockets.in(room.roomName).emit('setTimer', {
+    time: room.timer,
+  });
+}; */
+
+
+const findPlayers = (r, role) => {
+  const room = r;
+  const players = [];
+  const { users } = room;
+  const keys = Object.keys(users);
+  for (let i = 0; i < keys.length; i++) {
+    console.dir(users[keys[i]].startRole);
+    if (users[keys[i]].startRole === role) players.push(users[keys[i]]);
+  }
+
+  return players;
+};
+
+const handleRoleActions = (r) => {
+  console.dir('In actions');
+  const room = r;
+  const { roles } = room;
+  const roomIndex = rooms.indexOf(room);
+  let foundPlayers;
+
+  // Give a 10 second timer to take an action
+  room.timer = 10;
+  clearTimeout(roomTimeouts[roomIndex]);
+  roomTimeouts[roomIndex] = setTimeout(() => {
+    room.actionCount++;
+    handleRoleActions(room);
+  }, 12000);
+
+  if (room.actionCount === 0) {
+    if (roles.includes('Werewolf')) {
+      foundPlayers = findPlayers(room, 'Werewolf');
+      console.dir(foundPlayers);
+      if (foundPlayers.length === 1) {
+        // One werewolf is present in the game, the werewolf can look at a center card
+        io.to(foundPlayers[0].socketID).emit('wake');
+        io.to(foundPlayers[0].socketID).emit('changeAct', true);
+        io.to(foundPlayers[0].socketID).emit('screenMessage', { message: 'Werewolf, wake up!', submessage: 'You may view one of the unused role cards.' });
+        setTimeout(() => {
+          io.to(foundPlayers[0].socketID).emit('sleep');
+          io.to(foundPlayers[0].socketID).emit('changeAct', false);
+        }, 10000);
+      } else if (foundPlayers.length > 0) {
+        // Multiple werewolves, they all wake up and are highlighted
+        // Have the socket emit a highlight to the players
+        for (let i = 0; i < foundPlayers.length; i++) {
+          io.to(foundPlayers[i].socketID).emit('wake');
+          io.to(foundPlayers[i].socketID).emit('screenMessage', { message: 'Werewolves, wake up!', submessage: 'Take a look at your other werewolves.' });
+          for (let j = 0; j < foundPlayers.length; j++) {
+            io.to(foundPlayers[i].socketID).emit('flip', { hash: foundPlayers[j].hash, flipped: true });
+          }
+        }
+
+        setTimeout(() => {
+          for (let i = 0; i < foundPlayers.length; i++) {
+            io.to(foundPlayers[i].socketID).emit('sleep');
+            io.to(foundPlayers[i].socketID).emit('flipAll', { flipped: false });
+          }
+        }, 10000);
+      }
+    } else room.actionCount++;
+  }
+
+  if (room.actionCount === 1) {
+    if (roles.includes('Seer')) {
+      foundPlayers = findPlayers(room, 'Seer');
+      if (foundPlayers.length > 0) {
+        // Seer wakes up, they can look at two center cards or one other player's card
+        io.to(foundPlayers[0].socketID).emit('wake');
+        io.to(foundPlayers[0].socketID).emit('changeAct', true);
+        io.to(foundPlayers[0].socketID).emit('screenMessage', { message: 'Seer, wake up!', submessage: "Look at another player's role, or up to two of the unused roles." });
+        setTimeout(() => {
+          io.to(foundPlayers[0].socketID).emit('sleep');
+          io.to(foundPlayers[0].socketID).emit('changeAct', false);
+          io.to(foundPlayers[0].socketID).emit('flipAll', { flipped: false });
+        }, 10000);
+      }
+    } else room.actionCount++;
+  }
+
+  if (room.actionCount === 2) {
+    if (roles.includes('Robber')) {
+      foundPlayers = findPlayers(room, 'Robber');
+      if (foundPlayers.length > 0) {
+        // Robber wakes up and can swap cards with another player, then flip their card
+        io.to(foundPlayers[0].socketID).emit('wake');
+        io.to(foundPlayers[0].socketID).emit('changeAct', true);
+        io.to(foundPlayers[0].socketID).emit('screenMessage', { message: 'Robber, wake up!', submessage: 'Swap your role with another player, and see your new role.' });
+        setTimeout(() => {
+          io.to(foundPlayers[0].socketID).emit('sleep');
+          io.to(foundPlayers[0].socketID).emit('changeAct', false);
+          io.to(foundPlayers[0].socketID).emit('flip', { hash: foundPlayers[0].hash, flipped: false });
+        }, 10000);
+      }
+    } else room.actionCount++;
+  }
+
+  if (room.actionCount === 3) {
+    if (roles.includes('Insomniac')) {
+      foundPlayers = findPlayers(room, 'Insomniac');
+      if (foundPlayers.length > 0) {
+        // Insomniac wakes up and their card is flipped so they can view it
+        io.to(foundPlayers[0].socketID).emit('wake');
+        io.to(foundPlayers[0].socketID).emit('flip', { hash: foundPlayers[0].hash, flipped: true });
+        io.to(foundPlayers[0].socketID).emit('screenMessage', { message: 'Insomniac, wake up!', submessage: 'Look at your card and see if your role has changed.' });
+        setTimeout(() => {
+          io.to(foundPlayers[0].socketID).emit('sleep');
+          io.to(foundPlayers[0].socketID).emit('flip', { hash: foundPlayers[0].hash, flipped: false });
+        }, 10000);
+      }
+    } else room.actionCount++;
+  }
+
+  if (room.actionCount === 4) {
+    if (roles.includes('Revealer')) {
+      foundPlayers = findPlayers(room, 'Revealer');
+      if (foundPlayers.length > 0) {
+        // Revealer wakes up and attempts to flip over a player's card
+        // If the card is werewolf or a tanner, the card stays face down
+        // This is a change from the base game, where Revealer can gain some information
+        // but not the specific role of a player
+        io.to(foundPlayers[0].socketID).emit('wake');
+        io.to(foundPlayers[0].socketID).emit('changeAct', true);
+        io.to(foundPlayers[0].socketID).emit('screenMessage', { message: 'Revealer, wake up!', submessage: "Attempt to flip over another player's card." });
+        setTimeout(() => {
+          io.to(foundPlayers[0].socketID).emit('sleep');
+          io.to(foundPlayers[0].socketID).emit('changeAct', false);
+        }, 10000);
+      }
+    } else room.actionCount++;
+  }
+
+  if (room.actionCount === 5) {
+    clearTimeout(roomTimeouts[roomIndex]);
+    console.dir('done with actions');
+    io.sockets.in(room.roomName).emit('wake');
+    io.sockets.in(room.roomName).emit('screenMessage', { message: 'Everyone wake up!', submessage: 'You have 5 minutes to discuss before voting', disappear: true });
+  }
+};
+
+const startGame = (r) => {
+  const room = r;
+
+  assignRoles(room);
+
+  room.timer = 10;
+  room.actionCount = 0;
+  io.sockets.in(room.roomName).emit('screenMessage', { message: 'All players have been given their roles!', submessage: 'You have 10 seconds before you fall asleep.', disappear: true });
+  const { users } = room;
+  const keys = Object.keys(users);
+  for (let i = 0; i < keys.length; i++) {
+    io.to(users[keys[i]].socketID).emit('flip', { hash: users[keys[i]].hash, flipped: true });
+  }
+
+  const roomIndex = rooms.indexOf(room);
+  clearTimeout(roomTimeouts[roomIndex]);
+  roomTimeouts[roomIndex] = setTimeout(() => {
+    io.sockets.in(room.roomName).emit('sleep');
+    for (let i = 0; i < keys.length; i++) {
+      io.to(users[keys[i]].socketID).emit('flip', { hash: keys[i], flipped: false });
+    }
+    roomTimeouts[roomIndex] = setTimeout(() => {
+      handleRoleActions(room);
+    }, 2000);
+  }, 10000);
 };
 
 /* const endGame = (r) => {
@@ -161,17 +363,17 @@ const onJoined = (sock) => {
   sock.on('join', (data) => {
     // For this prototype, every player will be in their own room
     const socket = sock;
-    const room = createNewRoom();
+    const room = getBestRoom();
 
     socket.join(room.roomName);
 
     // Server itself doesn't care about height, width, prevX, and prevY (unless collisions)
     socket.hash = xxh.h32(`${socket.id}${new Date().getTime()}`, 0xDEADBEEF).toString(16);
 
-    room.users[socket.hash] = { name: data.name };
+    room.users[socket.hash] = { name: data.name, socketID: socket.id, hash: socket.hash };
 
-    // Start the game when there are 4 players
-    io.sockets.in(room.roomName).emit('screenMessage', { message: `${data.name} has joined the game`, submessage: 'Welcome!', disappear: true });
+    // Start the game when there are 6 players
+    io.sockets.in(room.roomName).emit('screenMessage', { message: `${data.name} has joined!`, submessage: `${6 - Object.keys(room.users).length} more players needed to start the game`, disappear: true });
 
     socket.roomName = room.roomName;
 
@@ -179,9 +381,18 @@ const onJoined = (sock) => {
       name: data.name,
       roomName: socket.roomName,
       hash: socket.hash,
+      socketID: socket.id,
     });
 
-    io.sockets.in(room.roomName).emit('addPlayer', { name: data.name, hash: socket.hash });
+    console.dir(room.users);
+
+    socket.emit('setPlayers', { players: room.users });
+
+    socket.broadcast.to(room.roomName).emit('addPlayer', { name: data.name, hash: socket.hash });
+
+    if (Object.keys(room.users).length === 6) {
+      startGame(room);
+    }
   });
 };
 
@@ -220,6 +431,16 @@ io.on('connection', (sock) => {
   socket.on('message', (data) => {
     const chatMessage = `${data.sender}: ${data.message}`;
     io.sockets.in(data.roomName).emit('addMessage', chatMessage);
+  });
+
+  socket.on('changeRole', (data) => {
+    const room = getRoom(data.roomName);
+    room.users[data.hash].role = data.newRole;
+    io.sockets.in(data.roomName).emit('setRole', { hash: data.hash, role: data.newRole });
+  });
+
+  socket.on('revealerFlip', (data) => {
+    io.sockets.in(data.roomName).emit('flip', { hash: data.hash, flipped: true });
   });
 });
 

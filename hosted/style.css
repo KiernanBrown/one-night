@@ -19,8 +19,9 @@ p {
 
 #chatCanvas {
   position: absolute;
-  left: 410px;
-  top: 40px;
+  left: 610px;
+  top: 37px;
+  border: 1px solid grey;
 }
 
 #usernameLabel {
