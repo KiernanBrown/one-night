@@ -200,6 +200,7 @@ const endGame = (r) => {
   }
 
   io.sockets.in(room.roomName).emit('screenMessage', { message: 'Game Over!', submessage: 'Please reconnect to play again', disappear: true });
+  io.sockets.in(room.roomName).emit('flipAll', { flipped: true });
 };
 
 const killPlayers = (r) => {
@@ -412,11 +413,11 @@ const handleRoleActions = (r) => {
     clearTimeout(roomTimeouts[roomIndex]);
     io.sockets.in(room.roomName).emit('day');
     io.sockets.in(room.roomName).emit('wake');
-    io.sockets.in(room.roomName).emit('screenMessage', { message: 'Everyone wake up!', submessage: 'You have 3 minutes to discuss before voting.', disappear: true });
+    io.sockets.in(room.roomName).emit('screenMessage', { message: 'Everyone wake up!', submessage: 'You have 2 and a half minutes to discuss before voting.', disappear: true });
     roomTimeouts[roomIndex] = setTimeout(() => {
       handleVoting(room);
-    }, 180000);
-    room.timer = 180;
+    }, 150000);
+    room.timer = 150;
   }
 };
 

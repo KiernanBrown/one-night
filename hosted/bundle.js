@@ -374,21 +374,21 @@ var setPlayerPositions = function setPlayerPositions() {
       setPosition(keys[5], canvas.width / 2.0 - 150, canvas.height / 2.0);
       break;
     case 7:
-      setPosition(keys[0], canvas.width / 2.0, canvas.height / 2.0 - 190);
+      setPosition(keys[0], canvas.width / 2.0, canvas.height / 2.0 - 150);
       setPosition(keys[1], canvas.width / 2.0 + 130, canvas.height / 2.0 - 100);
       setPosition(keys[2], canvas.width / 2.0 + 200, canvas.height / 2.0 + 50);
-      setPosition(keys[3], canvas.width / 2.0 + 80, canvas.height / 2.0 + 190);
-      setPosition(keys[4], canvas.width / 2.0 - 80, canvas.height / 2.0 + 190);
+      setPosition(keys[3], canvas.width / 2.0 + 80, canvas.height / 2.0 + 150);
+      setPosition(keys[4], canvas.width / 2.0 - 80, canvas.height / 2.0 + 150);
       setPosition(keys[5], canvas.width / 2.0 - 200, canvas.height / 2.0 + 50);
       setPosition(keys[6], canvas.width / 2.0 - 130, canvas.height / 2.0 - 100);
       break;
     case 8:
-      setPosition(keys[0], canvas.width / 2.0 - 75, canvas.height / 2.0 - 200);
-      setPosition(keys[1], canvas.width / 2.0 + 75, canvas.height / 2.0 - 200);
+      setPosition(keys[0], canvas.width / 2.0 - 75, canvas.height / 2.0 - 150);
+      setPosition(keys[1], canvas.width / 2.0 + 75, canvas.height / 2.0 - 150);
       setPosition(keys[2], canvas.width / 2.0 + 200, canvas.height / 2.0 - 75);
       setPosition(keys[3], canvas.width / 2.0 + 200, canvas.height / 2.0 + 75);
-      setPosition(keys[4], canvas.width / 2.0 + 75, canvas.height / 2.0 + 200);
-      setPosition(keys[5], canvas.width / 2.0 - 75, canvas.height / 2.0 + 200);
+      setPosition(keys[4], canvas.width / 2.0 + 75, canvas.height / 2.0 + 150);
+      setPosition(keys[5], canvas.width / 2.0 - 75, canvas.height / 2.0 + 150);
       setPosition(keys[6], canvas.width / 2.0 - 200, canvas.height / 2.0 + 75);
       setPosition(keys[7], canvas.width / 2.0 - 200, canvas.height / 2.0 - 75);
       break;
@@ -661,7 +661,7 @@ var connect = function connect(playerSize) {
   });
 
   socket.on('day', function () {
-    document.body.style.background = 'rgba(119, 234, 255, 0.12)';
+    document.body.style.background = 'white';
   });
 };
 
