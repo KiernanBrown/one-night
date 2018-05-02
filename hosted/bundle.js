@@ -16,8 +16,10 @@ var chatMessages = [];
 var newMessages = [];
 var roomName = '';
 var tokens = [];
+var selectedToken = void 0;
 var players = {};
 var canAct = false;
+var canVote = false;
 var unusedRoles = [];
 
 var inGame = false;
@@ -33,9 +35,87 @@ var sleepObj = {
 };
 
 var screenMessage = {};
+var timer = 10;
 
 var lerp = function lerp(v0, v1, alpha) {
   return (1 - alpha) * v0 + alpha * v1;
+};
+
+var joinLobby = function joinLobby() {
+  user = document.querySelector("#username").value;
+  var playerSize = parseInt(document.querySelector("#playerSize").value);
+  console.dir(playerSize);
+  if (isNaN(playerSize) || playerSize < 4 || playerSize > 8) return;
+  connect(playerSize);
+  createGameCanvas();
+
+  // Set up our canvas and chatCanvas
+  canvas = document.querySelector('#canvas');
+  ctx = canvas.getContext('2d');
+  chatCanvas = document.querySelector('#chatCanvas');
+  chatCtx = chatCanvas.getContext('2d');
+
+  canvas.addEventListener('mousemove', mouseMoveHandler);
+  canvas.addEventListener('click', mouseClickHandler);
+  canvas.addEventListener('mousedown', mouseDownHandler);
+  canvas.addEventListener('mouseup', mouseUpHandler);
+  chatCanvas.addEventListener('click', mouseClickHandler);
+
+  requestAnimationFrame(redraw);
+};
+
+var UsernameWindow = function UsernameWindow(props) {
+  return React.createElement(
+    'div',
+    { className: 'newForm' },
+    React.createElement(
+      'label',
+      { htmlFor: 'username' },
+      'Username: '
+    ),
+    React.createElement('input', { id: 'username', type: 'text', name: 'username' }),
+    React.createElement('br', null),
+    React.createElement(
+      'label',
+      { htmlFor: 'username' },
+      'Player Size (4-8): '
+    ),
+    React.createElement('input', { id: 'playerSize', type: 'text', name: 'playerSize' }),
+    React.createElement(
+      'div',
+      { className: 'row' },
+      React.createElement(
+        'p',
+        { className: 'centered' },
+        React.createElement(
+          'button',
+          { className: 'btn-large waves-effect waves-light green', onClick: joinLobby },
+          'Join Game'
+        )
+      )
+    )
+  );
+};
+
+var createUsernameWindow = function createUsernameWindow() {
+  ReactDOM.render(React.createElement(UsernameWindow, null), document.querySelector("#content"));
+};
+
+var GameCanvas = function GameCanvas(props) {
+  return React.createElement(
+    'div',
+    { id: 'canvasHolder' },
+    React.createElement(
+      'canvas',
+      { id: 'canvas', height: '800', width: '700' },
+      'Please use an HTML 5 browser'
+    ),
+    React.createElement('canvas', { id: 'chatCanvas', height: '800', width: '300' })
+  );
+};
+
+var createGameCanvas = function createGameCanvas() {
+  ReactDOM.render(React.createElement(GameCanvas, null), document.querySelector("#content"));
 };
 
 var wrapText = function wrapText(chat, text, x, startY, width, lineHeight) {
@@ -76,29 +156,18 @@ var drawMessages = function drawMessages() {
 var drawChat = function drawChat() {
   // Draw the message the user is typing
   var messageText = user + ': ' + userChat;
-  ctx.fillStyle = 'black';
+  if (!sleeping) ctx.fillStyle = 'black';else ctx.fillStyle = 'white';
   ctx.font = '18px Helvetica';
   ctx.fillText(messageText, 20, 20);
 
   drawMessages();
 };
 
-// Draw any newly posted messages to the screen
-// Newly sent messages stay on screen for 5 seconds
-var drawNewMessages = function drawNewMessages() {
-  chatCtx.fillStyle = 'black';
-  chatCtx.font = '18px Helvetica';
-  var currentY = 20;
-  for (var i = newMessages.length - 1; i >= 0; i--) {
-    currentY = wrapText(chatCtx, newMessages[i], 2, currentY, 300, 20) + 30;
-  }
-};
-
 var setPosition = function setPosition(pHash, x, y) {
   var p = players[pHash];
 
   p.x = x;
-  p.y = y + 100;
+  p.y = y + 160;
 };
 
 var drawRoundRect = function drawRoundRect(x, y, size, cornerRadius) {
@@ -121,7 +190,7 @@ var drawRoleCard = function drawRoleCard(x, y, role, flipped) {
     ctx.fill();
     ctx.stroke();
   } else {
-    if (role === 'Villager' || role === 'Seer' || role === 'Robber' || role === 'Revealer' || role === 'Insomniac') ctx.fillStyle = 'rgba(125, 168, 237, 0.8)';else if (role === 'Werewolf') ctx.fillStyle = 'rgba(193, 62, 42, 0.8)';else ctx.fillStyle = 'rgba(140, 140, 140, 0.8)';
+    if (role === 'Villager' || role === 'Seer' || role === 'Robber' || role === 'Revealer' || role === 'Insomniac' || role === 'Mason') ctx.fillStyle = 'rgba(125, 168, 237, 0.8)';else if (role === 'Werewolf') ctx.fillStyle = 'rgba(193, 62, 42, 0.8)';else ctx.fillStyle = 'rgba(140, 140, 140, 0.8)';
 
     var cardText = role.substring(0, 3);
     drawRoundRect(x, y, 45, 4);
@@ -129,7 +198,7 @@ var drawRoleCard = function drawRoleCard(x, y, role, flipped) {
     ctx.stroke();
     ctx.fillStyle = 'black';
     ctx.font = '20px Helvetica';
-    ctx.fillText(cardText, x - ctx.measureText(cardText).width / 2, y - 10);
+    ctx.fillText(cardText, x - ctx.measureText(cardText).width / 2, y + 5);
   }
 };
 
@@ -179,12 +248,42 @@ var drawUnusedRoles = function drawUnusedRoles() {
   }
 };
 
+var drawToken = function drawToken(token) {
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = 3;
+
+  if (token.role === 'Villager' || token.role === 'Seer' || token.role === 'Robber' || token.role === 'Revealer' || token.role === 'Insomniac' || token.role === 'Mason') ctx.fillStyle = 'rgba(125, 168, 237, 0.8)';else if (token.role === 'Werewolf') ctx.fillStyle = 'rgba(193, 62, 42, 0.8)';else ctx.fillStyle = 'rgba(140, 140, 140, 0.8)';
+
+  ctx.beginPath();
+  ctx.arc(token.x, token.y, 25, 0, Math.PI * 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  var tokenText = token.role.substring(0, 3);
+  ctx.fillStyle = 'black';
+  ctx.font = '18px Helvetica';
+  ctx.fillText(tokenText, token.x - ctx.measureText(tokenText).width / 2, token.y + 5);
+};
+
 var drawGame = function drawGame(deltaTime) {
+  // Draw our timer
+  ctx.font = '24px Helvetica';
+  ctx.fillStyle = 'black';
+  ctx.fillText('Timer: ' + timer, 350 - ctx.measureText('Timer: ' + timer).width / 2, 40);
+
   // Draw all the players in the game
   drawPlayers();
 
   // Draw the 3 unused Roles
   drawUnusedRoles();
+
+  // Draw the tokens
+  if (tokens.length > 0) {
+    for (var i = tokens.length - 1; i >= 0; i--) {
+      drawToken(tokens[i]);
+    }
+  }
 
   // Draw our sleepObj
   if (sleepObj.alpha < 1) {
@@ -194,23 +293,11 @@ var drawGame = function drawGame(deltaTime) {
     sleepObj.y = sleepObj.destY;
   }
   ctx.fillStyle = 'black';
-  ctx.fillRect(sleepObj.x, sleepObj.y, 600, 800);
+  ctx.fillRect(sleepObj.x, sleepObj.y, 700, 800);
 
   if (chatting) drawChat();else drawMessages();
   // if (chatting) drawChat();
   // else if (newMessages.length > 0) drawNewMessages();
-};
-
-var drawMenu = function drawMenu() {
-  // Draw our play button
-  ctx.strokeStyle = 'black';
-  ctx.lineWidth = 5;
-  ctx.fillStyle = 'green';
-  ctx.fillRect(200, 200, 200, 140);
-  ctx.strokeRect(200, 200, 200, 140);
-  ctx.font = '32px Helvetica';
-  ctx.fillStyle = 'black';
-  ctx.fillText('Play', 300 - ctx.measureText('Play').width / 2, 270);
 };
 
 var redraw = function redraw(time) {
@@ -222,8 +309,6 @@ var redraw = function redraw(time) {
 
   if (inGame) {
     drawGame(deltaTime);
-  } else {
-    drawMenu();
   }
 
   if (screenMessage) {
@@ -237,14 +322,14 @@ var redraw = function redraw(time) {
       // https://www.w3schools.com/tags/canvas_measuretext.asp
       ctx.font = '32px Helvetica';
       ctx.fillStyle = 'rgba(0, 0, 0, ' + screenMessage.alpha + ')';
-      var textX = 300 - ctx.measureText(screenMessage.message).width / 2;
-      ctx.fillText(screenMessage.message, textX, 200);
+      var textX = 350 - ctx.measureText(screenMessage.message).width / 2;
+      ctx.fillText(screenMessage.message, textX, 280);
 
       if (screenMessage.submessage) {
         ctx.font = '24px Helvetica';
         ctx.fillStyle = 'rgba(0, 0, 0, ' + screenMessage.alpha + ')';
-        var subtextX = 300 - ctx.measureText(screenMessage.submessage).width / 2;
-        ctx.fillText(screenMessage.submessage, subtextX, 240);
+        var subtextX = 350 - ctx.measureText(screenMessage.submessage).width / 2;
+        ctx.fillText(screenMessage.submessage, subtextX, 320);
       }
     }
   }
@@ -316,6 +401,7 @@ var setUser = function setUser(data) {
   var h = data.hash;
   hash = h;
   players[hash] = { name: data.name };
+  if (roomName != 'Lobby') inGame = true;
 };
 
 var addUser = function addUser(data) {
@@ -373,10 +459,66 @@ var keyDownHandler = function keyDownHandler(e) {
   }
 };
 
-/* const mouseMoveHandler = (e) => {
-  square.mouseX = e.pageX - canvas.offsetLeft;
-  square.mouseY = e.pageY - canvas.offsetTop;
-}; */
+var mouseMoveHandler = function mouseMoveHandler(e) {
+  var mouseX = e.pageX - canvas.offsetLeft;
+  var mouseY = e.pageY - canvas.offsetTop;
+  canvas.style.cursor = 'default';
+
+  if (selectedToken) {
+    selectedToken.x = mouseX;
+    selectedToken.y = mouseY;
+  }
+
+  if (tokens.length > 0) {
+    for (var i = 0; i < tokens.length; i++) {
+      var token = tokens[i];
+      ctx.beginPath();
+      ctx.arc(token.x, token.y, 25, 0, Math.PI * 2);
+      ctx.closePath();
+      if (ctx.isPointInPath(mouseX, mouseY)) {
+        canvas.style.cursor = 'pointer';
+        return;
+      }
+    }
+  }
+
+  if (canVote) {
+    var keys = Object.keys(players);
+    for (var _i = 0; _i < keys.length; _i++) {
+      var p = players[keys[_i]];
+      drawRoundRect(p.x, p.y, 45, 4);
+      if (ctx.isPointInPath(mouseX, mouseY)) {
+        canvas.style.cursor = 'pointer';
+        return;
+      }
+    }
+  }
+
+  if (canAct) {
+    if (players[hash].startRole === 'Werewolf' || players[hash].startRole === 'Seer') {
+      for (var _i2 = 0; _i2 < unusedRoles.length; _i2++) {
+        var card = unusedRoles[_i2];
+        drawRoundRect(card.x, card.y, 45, 4);
+        if (ctx.isPointInPath(mouseX, mouseY)) {
+          canvas.style.cursor = 'pointer';
+          return;
+        }
+      }
+    }
+
+    if (players[hash].startRole === 'Seer' || players[hash].startRole === 'Robber' || players[hash].startRole === 'Revealer') {
+      var _keys = Object.keys(players);
+      for (var _i3 = 0; _i3 < _keys.length; _i3++) {
+        var _p = players[_keys[_i3]];
+        drawRoundRect(_p.x, _p.y, 45, 4);
+        if (ctx.isPointInPath(mouseX, mouseY)) {
+          canvas.style.cursor = 'pointer';
+          return;
+        }
+      }
+    }
+  }
+};
 
 var addScreenMessage = function addScreenMessage(data) {
   screenMessage = {
@@ -445,22 +587,33 @@ var setUnusedRoles = function setUnusedRoles(data) {
       role: roles[i],
       flipped: false,
       x: x,
-      y: 100
+      y: 120
     });
   }
 };
 
-var connect = function connect() {
+var setTokens = function setTokens(data) {
+  tokens.length = 0;
+  var xOffset = (700 - data.tokens.length * 60) / 2 + 30;
+  for (var i = 0; i < data.tokens.length; i++) {
+    var token = {
+      role: data.tokens[i],
+      x: i * 60 + xOffset,
+      y: 210
+    };
+    tokens.push(token);
+  }
+};
+
+var connect = function connect(playerSize) {
   socket = io.connect();
 
   socket.on('connect', function () {
-    user = document.querySelector("#username").value;
-
     if (!user) {
       user = 'unknown';
     }
 
-    socket.emit('join', { name: user });
+    socket.emit('join', { name: user, playerSize: playerSize });
   });
 
   socket.on('joined', setUser);
@@ -492,6 +645,24 @@ var connect = function connect() {
   socket.on('changeAct', function (data) {
     canAct = data;
   });
+
+  socket.on('setTokens', setTokens);
+
+  socket.on('setTimer', function (data) {
+    timer = data.time;
+  });
+
+  socket.on('canVote', function () {
+    canVote = true;
+  });
+
+  socket.on('night', function () {
+    document.body.style.background = 'rgba(63, 59, 69, 0.45)';
+  });
+
+  socket.on('day', function () {
+    document.body.style.background = 'rgba(119, 234, 255, 0.12)';
+  });
 };
 
 var handleAction = function handleAction(clickedObj) {
@@ -505,8 +676,29 @@ var handleAction = function handleAction(clickedObj) {
   }
   if (players[hash].startRole === 'Seer') {
     if (clickedObj.hash) {
-      canAct = false;
-      clickedObj.flipped = true;
+      var clickedRoles = 0;
+      for (var i = 0; i < unusedRoles.length; i++) {
+        if (unusedRoles[i].flipped) clickedRoles++;
+      }
+      console.dir(clickedRoles);
+
+      if (clickedRoles === 0) {
+        canAct = false;
+        clickedObj.flipped = true;
+      }
+    } else if (clickedObj.role) {
+      var _clickedRoles = 0;
+      for (var _i4 = 0; _i4 < unusedRoles.length; _i4++) {
+        if (unusedRoles[_i4].flipped) _clickedRoles++;
+      }
+
+      if (_clickedRoles < 2) {
+        unusedRoles[unusedRoles.indexOf(clickedObj)].flipped = true;
+        clickedObj.flipped = true;
+
+        _clickedRoles++;
+        if (_clickedRoles === 2) canAct = false;
+      }
     }
   }
   if (players[hash].startRole === 'Robber') {
@@ -528,6 +720,15 @@ var handleAction = function handleAction(clickedObj) {
       socket.emit('revealerFlip', { roomName: roomName, hash: pHash });
     }
   }
+};
+
+var handleVote = function handleVote(clickedPlayer) {
+  // You cannot vote for yourself
+  if (clickedPlayer.hash === hash) return;
+
+  canVote = false;
+  addScreenMessage({ message: 'You have voted for ' + clickedPlayer.name });
+  socket.emit('vote', { roomName: roomName, hash: clickedPlayer.hash });
 };
 
 var checkPlayerClick = function checkPlayerClick(mX, mY) {
@@ -559,37 +760,44 @@ var mouseClickHandler = function mouseClickHandler(e) {
   var mouseX = e.pageX - canvas.offsetLeft;
   var mouseY = e.pageY - canvas.offsetTop;
 
-  if (!inGame) {
-    if (mouseX >= 200 && mouseX <= 400) {
-      if (mouseY >= 200 && mouseY <= 340) {
-        inGame = true;
-        connect();
+  if (canAct) {
+    var clickedPlayer = checkPlayerClick(mouseX, mouseY);
+    if (clickedPlayer) handleAction(clickedPlayer);
+    var clickedRole = checkRoleClick(mouseX, mouseY);
+    if (clickedRole) handleAction(clickedRole);
+  } else if (canVote) {
+    var votedPlayer = checkPlayerClick(mouseX, mouseY);
+    if (votedPlayer.hash) handleVote(votedPlayer);
+  }
+};
+
+var mouseDownHandler = function mouseDownHandler(e) {
+  var mouseX = e.pageX - canvas.offsetLeft;
+  var mouseY = e.pageY - canvas.offsetTop;
+
+  if (tokens.length > 0) {
+    for (var i = 0; i < tokens.length; i++) {
+      var token = tokens[i];
+      ctx.beginPath();
+      ctx.arc(token.x, token.y, 25, 0, Math.PI * 2);
+      ctx.closePath();
+      if (ctx.isPointInPath(mouseX, mouseY)) {
+        selectedToken = token;
+        return;
       }
-    }
-  } else {
-    if (canAct) {
-      var clickedPlayer = checkPlayerClick(mouseX, mouseY);
-      if (clickedPlayer) handleAction(clickedPlayer);
-      var clickedRole = checkRoleClick(mouseX, mouseY);
-      if (clickedRole) handleAction(clickedRole);
     }
   }
 };
 
+var mouseUpHandler = function mouseUpHandler() {
+  selectedToken = {};
+};
+
 var init = function init() {
-  canvas = document.querySelector('#canvas');
-  ctx = canvas.getContext('2d');
-  chatCanvas = document.querySelector('#chatCanvas');
-  chatCtx = chatCanvas.getContext('2d');
+  createUsernameWindow();
 
   document.body.addEventListener('keydown', keyDownHandler);
   document.body.addEventListener('keypress', keyPressHandler);
-  // canvas.addEventListener('mousemove', mouseMoveHandler);
-  canvas.addEventListener('click', mouseClickHandler);
-  // chatCanvas.addEventListener('mousemove', mouseMoveHandler);
-  chatCanvas.addEventListener('click', mouseClickHandler);
-
-  requestAnimationFrame(redraw);
 };
 
 window.onload = init;

@@ -1,0 +1,67 @@
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>One Night</title>
+  <script crossorigin src="https://unpkg.com/react@15/dist/react.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@15/dist/react-dom.min.js"></script>
+  <script crossorigin src="https://unpkg.com/prop-types/prop-types.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-core/5.8.34/browser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.2.0/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/remarkable/1.6.2/remarkable.min.js"></script>
+  <link rel="shortcut icon" href="/assets/img/favicon.png"/>
+  <link rel="stylesheet" type="text/css" href="/assets/materialize.min.css"/>
+  <link rel="stylesheet" type="text/css" href="/assets/style.css"/>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+<body>
+  <nav>
+    <div class="nav-wrapper">
+      <a href="#" class="brand-logo center">One Night</a>
+      <ul id="nav-mobile" class="right">
+        <li><a href="/main">Main</a></li>
+        <li class="active"><a href="/help">How To Play</a></li>
+        <li><a href="/premium">Premium</a></li>
+      </ul>
+    </div>
+  </nav>
+  <section id="helpContent">
+    <h1>How To Play</h1>
+    <p>One night is a fast paced social deduction game that can be played with 4-8 players. To enter a game, go to the Main page of the site and enter a username and the number of players that you want in the game you are in. After doing so, the server will connect you to an open game that fits your player size, or it will create a new room for you. The game will start once the specified number of players for the game has been reached. Players can talk to each other before or during the game by hitting enter to start chatting, type out a message, and then hit enter to send their message. Players could also use other chat services such as Discord while playing for an easier way of communicating.</p>
+    
+    <h3>Gameplay</h3>
+    <p>A game of One Night starts with each player receiving their role card and seeing what role they are. Information on each of the roles can be seen below. After receiving your roles, every player goes to sleep. Throughout the night, players will be woken up to complete their actions that they can take throughout the night. When you are woken up, you will have 10 seconds to complete your action. If you do not complete your action before time runs out, your action is skipped. If you do not want to do your action, you can always just wait for time to run out. After every player has taken their actions during the night, everyone is woken up. During the day, players have 3 minutes to discuss the actions that they took during the night, the information they gained, or anything else, in order to try to determine what roles certain people are. Players all have their own tokens that they can move around on the screen in order to keep track of information that they see as important, and only they can see where their tokens are placed. After this 3 minutes of discussion is over, players can vote for the player that they would like to kill. The players with the most votes are killed, but only if the players have more than 1 vote. If every player has 1 vote, then no players are killed.</p>
+    
+    <h3>Team and Role Information</h3>
+    <ul>
+      <p>Werewolf Team: This team wins if all werewolves survive the vote at the end of the day</p>
+      <ul>
+        <li>Werewolf (Wer): This role is part of the werewolf team. Werewolves wake up at the start of the night and are able to see the other werewolves on their team. If there is only one werewolf present in the game, the werewolf can look at one of the the 3 unused role cards. The werewolf team wins if all werewolves survive the vote at the end of the day. Lie, trick, and deceive the villagers to protect yourself and your teammates.</li>
+      </ul>
+      <p>Villager Team: This team wins if at least one werewolf is killed during the vote at the end of the day. If no werewolves are present, then the villager team wins if no players are killed during the vote.</p>
+      <ul>
+        <li>Villager (Vil): This role is part of the villager team. Villagers have no special action for their role.</li>
+        <li>Mason (Mas): This role is part of the villager team. There will always be 2 mason cards in the game if the mason role is being used. Masons wake up during the night and see who the other masons are. If you are the only mason who woke up, then the other mason card is one of the unused role cards.</li>
+        <li>The Seer (See): This role is part of the villager team. The Seer can choose to either view the role card of another player in the game, or to view up to 2 of the unused role cards in the game. Use the information you gain from your role action to steer your team in the right direction during your discussion.</li>
+        <li>The Robber (Rob): This role is part of the villager team. The Robber can choose to swap their role card with the role card of another player, and then look at your new role card. The card you steal becomes your new role, so you might need to switch up your playstyle depending on which role you stole.</li>
+        <li>The Insomniac (Ins): This role is part of the villager team. The Insomniac has trouble sleeping, and they wake up towards the end of the night to check their role card. This allows the insomniac to see if their role was changed during the night.</li>
+        <li>The Revealer (Rev): This role is part of the villager team. The Revealer can attempt to flip over the role card of another player, and that card will remain face up for the rest of the game. If the role card you attempt to flip is a Werewolf or Tanner, then you will be unable to flip the card.</li>
+      </ul>
+      <p>Third Parties: Third Party roles have their own goals and win conditions</p>
+      <ul>
+        <li>The Tanner (Tan): The Tanner hates his job, and his only goal is to die. You win if you die during the vote at the end of the day.</li>
+      </ul>
+    </ul>
+    
+    <h3>Role Action Order</h3>
+    <p>Role Actions that take place during the night follow this order. If a role is not being used in the game, then that action is skipped.</p>
+    <ol>
+      <li>Werewolves wake up and see the other werewolves. If there is only one werewolf, the werewolf can look at one of the 3 unused role cards.</li>
+      <li>Masons wake up and see the other masons.</li>
+      <li>The Seer wakes up and can look at the role card of another player in the game, or up to 2 of the 3 unused role cards.</li>
+      <li>The Robber wakes up and can swap role cards with another player, and then gets to look at their new role card.</li>
+      <li>The Insomniac wakes up and looks at their role card.</li>
+      <li>The Revealer wakes up and can attempt to flip over the role card of another player. If the player is a Werewolf or Tanner, their role card stays face down. Otherwise, the role card stays face up for the rest of the game.</li>
+    </ol>
+  </section>
+</body>
+</html>

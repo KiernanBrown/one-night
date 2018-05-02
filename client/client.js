@@ -13,9 +13,11 @@ let userChat = '';
 const chatMessages = [];
 const newMessages = [];
 let roomName = '';
-let tokens = [];
+const tokens = [];
+let selectedToken;
 let players = {};
 let canAct = false;
+let canVote = false;
 const unusedRoles = [];
 
 let inGame = false;
@@ -31,8 +33,70 @@ const sleepObj = {
 };
 
 let screenMessage = {};
+let timer = 10;
 
 const lerp = (v0, v1, alpha) => ((1 - alpha) * v0) + (alpha * v1);
+
+const joinLobby = () => {
+  user = document.querySelector("#username").value;
+  let playerSize = parseInt(document.querySelector("#playerSize").value);
+  console.dir(playerSize);
+  if (isNaN(playerSize) || playerSize < 4 || playerSize > 8) return;
+  connect(playerSize);
+  createGameCanvas();
+  
+  // Set up our canvas and chatCanvas
+  canvas = document.querySelector('#canvas');
+  ctx = canvas.getContext('2d');
+  chatCanvas = document.querySelector('#chatCanvas');
+  chatCtx = chatCanvas.getContext('2d');
+  
+  canvas.addEventListener('mousemove', mouseMoveHandler);
+  canvas.addEventListener('click', mouseClickHandler);
+  canvas.addEventListener('mousedown', mouseDownHandler);
+  canvas.addEventListener('mouseup', mouseUpHandler);
+  chatCanvas.addEventListener('click', mouseClickHandler);
+  
+  requestAnimationFrame(redraw);
+};
+
+const UsernameWindow = (props) => {
+  return (
+    <div className='newForm'>
+      <label htmlFor="username">Username: </label>
+      <input id="username" type="text" name="username"/>
+      <br />
+      <label htmlFor="username">Player Size (4-8): </label>
+      <input id="playerSize" type="text" name="playerSize"/>
+      <div className="row">
+        <p className="centered"><button className="btn-large waves-effect waves-light green" onClick={joinLobby}>Join Game</button></p>
+      </div>
+    </div>
+  );
+};
+
+const createUsernameWindow = () => {
+  ReactDOM.render(
+    <UsernameWindow />,
+    document.querySelector("#content")
+  );
+};
+
+const GameCanvas = (props) => {
+  return (
+    <div id="canvasHolder">
+      <canvas id="canvas" height="800" width="700">Please use an HTML 5 browser</canvas>
+      <canvas id="chatCanvas" height="800" width="300"></canvas>
+    </div>
+  );
+};
+
+const createGameCanvas = () => {
+  ReactDOM.render(
+    <GameCanvas />,
+    document.querySelector("#content")
+  );
+};
 
 const wrapText = (chat, text, x, startY, width, lineHeight) => {
   // Code based on this tutorial:
@@ -72,29 +136,19 @@ const drawMessages = () => {
 const drawChat = () => {
   // Draw the message the user is typing
   const messageText = `${user}: ${userChat}`;
-  ctx.fillStyle = 'black';
+  if (!sleeping) ctx.fillStyle = 'black';
+  else ctx.fillStyle = 'white';
   ctx.font = '18px Helvetica';
   ctx.fillText(messageText, 20, 20);
-  
-  drawMessages();
-};
 
-// Draw any newly posted messages to the screen
-// Newly sent messages stay on screen for 5 seconds
-const drawNewMessages = () => {
-  chatCtx.fillStyle = 'black';
-  chatCtx.font = '18px Helvetica';
-  let currentY = 20;
-  for (let i = newMessages.length - 1; i >= 0; i--) {
-    currentY = wrapText(chatCtx, newMessages[i], 2, currentY, 300, 20) + 30;
-  }
+  drawMessages();
 };
 
 const setPosition = (pHash, x, y) => {
   const p = players[pHash];
 
   p.x = x;
-  p.y = y + 100;
+  p.y = y + 160;
 };
 
 const drawRoundRect = (x, y, size, cornerRadius) => {
@@ -117,7 +171,7 @@ const drawRoleCard = (x, y, role, flipped) => {
     ctx.fill();
     ctx.stroke();
   } else {
-    if (role === 'Villager' || role === 'Seer' || role === 'Robber' || role === 'Revealer' || role === 'Insomniac') ctx.fillStyle = 'rgba(125, 168, 237, 0.8)';
+    if (role === 'Villager' || role === 'Seer' || role === 'Robber' || role === 'Revealer' || role === 'Insomniac' || role === 'Mason') ctx.fillStyle = 'rgba(125, 168, 237, 0.8)';
     else if (role === 'Werewolf') ctx.fillStyle = 'rgba(193, 62, 42, 0.8)';
     else ctx.fillStyle = 'rgba(140, 140, 140, 0.8)';
 
@@ -127,7 +181,7 @@ const drawRoleCard = (x, y, role, flipped) => {
     ctx.stroke();
     ctx.fillStyle = 'black';
     ctx.font = '20px Helvetica';
-    ctx.fillText(cardText, x - (ctx.measureText(cardText).width / 2), y - 10);
+    ctx.fillText(cardText, x - (ctx.measureText(cardText).width / 2), y + 5);
   }
 };
 
@@ -177,12 +231,44 @@ const drawUnusedRoles = () => {
   }
 };
 
+const drawToken = (token) => {
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = 3;
+
+  if (token.role === 'Villager' || token.role === 'Seer' || token.role === 'Robber' || token.role === 'Revealer' || token.role === 'Insomniac' || token.role === 'Mason') ctx.fillStyle = 'rgba(125, 168, 237, 0.8)';
+  else if (token.role === 'Werewolf') ctx.fillStyle = 'rgba(193, 62, 42, 0.8)';
+  else ctx.fillStyle = 'rgba(140, 140, 140, 0.8)';
+
+  ctx.beginPath();
+  ctx.arc(token.x, token.y, 25, 0, Math.PI * 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  const tokenText = token.role.substring(0, 3);
+  ctx.fillStyle = 'black';
+  ctx.font = '18px Helvetica';
+  ctx.fillText(tokenText, token.x - (ctx.measureText(tokenText).width / 2), token.y + 5);
+};
+
 const drawGame = (deltaTime) => {
+  // Draw our timer
+  ctx.font = '24px Helvetica';
+  ctx.fillStyle = 'black';
+  ctx.fillText(`Timer: ${timer}`, 350 - (ctx.measureText(`Timer: ${timer}`).width / 2), 40);
+
   // Draw all the players in the game
   drawPlayers();
 
   // Draw the 3 unused Roles
   drawUnusedRoles();
+
+  // Draw the tokens
+  if (tokens.length > 0) {
+    for (let i = tokens.length - 1; i >= 0; i--) {
+      drawToken(tokens[i]);
+    }
+  }
 
   // Draw our sleepObj
   if (sleepObj.alpha < 1) {
@@ -192,24 +278,12 @@ const drawGame = (deltaTime) => {
     sleepObj.y = sleepObj.destY;
   }
   ctx.fillStyle = 'black';
-  ctx.fillRect(sleepObj.x, sleepObj.y, 600, 800);
+  ctx.fillRect(sleepObj.x, sleepObj.y, 700, 800);
 
   if (chatting) drawChat();
   else drawMessages();
   // if (chatting) drawChat();
   // else if (newMessages.length > 0) drawNewMessages();
-};
-
-const drawMenu = () => {
-  // Draw our play button
-  ctx.strokeStyle = 'black';
-  ctx.lineWidth = 5;
-  ctx.fillStyle = 'green';
-  ctx.fillRect(200, 200, 200, 140);
-  ctx.strokeRect(200, 200, 200, 140);
-  ctx.font = '32px Helvetica';
-  ctx.fillStyle = 'black';
-  ctx.fillText('Play', 300 - (ctx.measureText('Play').width / 2), 270);
 };
 
 const redraw = (time) => {  
@@ -221,8 +295,6 @@ const redraw = (time) => {
 
   if (inGame) {
     drawGame(deltaTime);
-  } else {
-    drawMenu();
   }
 
   if (screenMessage) {
@@ -236,14 +308,14 @@ const redraw = (time) => {
       // https://www.w3schools.com/tags/canvas_measuretext.asp
       ctx.font = '32px Helvetica';
       ctx.fillStyle = `rgba(0, 0, 0, ${screenMessage.alpha})`;
-      const textX = 300 - (ctx.measureText(screenMessage.message).width / 2);
-      ctx.fillText(screenMessage.message, textX, 200);
+      const textX = 350 - (ctx.measureText(screenMessage.message).width / 2);
+      ctx.fillText(screenMessage.message, textX, 280);
 
       if (screenMessage.submessage) {
         ctx.font = '24px Helvetica';
         ctx.fillStyle = `rgba(0, 0, 0, ${screenMessage.alpha})`;
-        const subtextX = 300 - (ctx.measureText(screenMessage.submessage).width / 2);
-        ctx.fillText(screenMessage.submessage, subtextX, 240);
+        const subtextX = 350 - (ctx.measureText(screenMessage.submessage).width / 2);
+        ctx.fillText(screenMessage.submessage, subtextX, 320);
       }
     }
   }
@@ -306,6 +378,7 @@ const setUser = (data) => {
   const h = data.hash;
   hash = h;
   players[hash] = { name: data.name };
+  if (roomName != 'Lobby') inGame = true;
 };
 
 const addUser = (data) => {
@@ -362,10 +435,66 @@ const keyDownHandler = (e) => {
   }
 };
 
-/* const mouseMoveHandler = (e) => {
-  square.mouseX = e.pageX - canvas.offsetLeft;
-  square.mouseY = e.pageY - canvas.offsetTop;
-}; */
+const mouseMoveHandler = (e) => {
+  const mouseX = e.pageX - canvas.offsetLeft;
+  const mouseY = e.pageY - canvas.offsetTop;
+  canvas.style.cursor = 'default';
+
+  if (selectedToken) {
+    selectedToken.x = mouseX;
+    selectedToken.y = mouseY;
+  }
+
+  if (tokens.length > 0) {
+    for (let i = 0; i < tokens.length; i++) {
+      const token = tokens[i];
+      ctx.beginPath();
+      ctx.arc(token.x, token.y, 25, 0, Math.PI * 2);
+      ctx.closePath();
+      if (ctx.isPointInPath(mouseX, mouseY)) {
+        canvas.style.cursor = 'pointer';
+        return;
+      }
+    }
+  }
+
+  if (canVote) {
+    const keys = Object.keys(players);
+    for (let i = 0; i < keys.length; i++) {
+      const p = players[keys[i]];
+      drawRoundRect(p.x, p.y, 45, 4);
+      if (ctx.isPointInPath(mouseX, mouseY)) {
+        canvas.style.cursor = 'pointer';
+        return;
+      }
+    }
+  }
+
+  if (canAct) {
+    if (players[hash].startRole === 'Werewolf' || players[hash].startRole === 'Seer') {
+      for (let i = 0; i < unusedRoles.length; i++) {
+        const card = unusedRoles[i];
+        drawRoundRect(card.x, card.y, 45, 4);
+        if (ctx.isPointInPath(mouseX, mouseY)) {
+          canvas.style.cursor = 'pointer';
+          return;
+        }
+      }
+    }
+
+    if (players[hash].startRole === 'Seer' || players[hash].startRole === 'Robber' || players[hash].startRole === 'Revealer') {
+      const keys = Object.keys(players);
+      for (let i = 0; i < keys.length; i++) {
+        const p = players[keys[i]];
+        drawRoundRect(p.x, p.y, 45, 4);
+        if (ctx.isPointInPath(mouseX, mouseY)) {
+          canvas.style.cursor = 'pointer';
+          return;
+        }
+      }
+    }
+  }
+};
 
 const addScreenMessage = (data) => {
   screenMessage = {
@@ -388,7 +517,7 @@ const sleep = () => {
   sleepObj.alpha = 0;
   sleepObj.destY = 0;
   sleepObj.prevY = -800;
-  for(let i = 0; i < unusedRoles.length; i++) {
+  for (let i = 0; i < unusedRoles.length; i++) {
     unusedRoles[i].flipped = false;
   }
 };
@@ -431,22 +560,33 @@ const setUnusedRoles = (data) => {
       role: roles[i],
       flipped: false,
       x,
-      y: 100,
+      y: 120,
     });
   }
 };
 
-const connect = () => {
+const setTokens = (data) => {
+  tokens.length = 0;
+  const xOffset = ((700 - (data.tokens.length * 60)) / 2) + 30;
+  for (let i = 0; i < data.tokens.length; i++) {
+    const token = {
+      role: data.tokens[i],
+      x: (i * 60) + xOffset,
+      y: 210,
+    };
+    tokens.push(token);
+  }
+};
+
+const connect = (playerSize) => {
   socket = io.connect();
   
-  socket.on('connect', () => {
-    user = document.querySelector("#username").value;
-                
+  socket.on('connect', () => {                
     if(!user) {
       user = 'unknown';
     }
                 
-    socket.emit('join', { name: user });
+    socket.emit('join', { name: user, playerSize });
   });
 
   socket.on('joined', setUser);
@@ -478,6 +618,24 @@ const connect = () => {
   socket.on('changeAct', (data) => {
     canAct = data;
   });
+  
+  socket.on('setTokens', setTokens);
+  
+  socket.on('setTimer', (data) => {
+    timer = data.time;
+  });
+  
+  socket.on('canVote', () => {
+    canVote = true;
+  });
+  
+  socket.on('night', () => {
+    document.body.style.background = 'rgba(63, 59, 69, 0.45)';
+  });
+  
+  socket.on('day', () => {
+    document.body.style.background = 'rgba(119, 234, 255, 0.12)';
+  });
 };
 
 const handleAction = (clickedObj) => {
@@ -491,8 +649,29 @@ const handleAction = (clickedObj) => {
   }
   if (players[hash].startRole === 'Seer') {
     if (clickedObj.hash) {
-      canAct = false;
-      clickedObj.flipped = true;
+      let clickedRoles = 0;
+      for (let i = 0; i < unusedRoles.length; i++) {
+        if (unusedRoles[i].flipped) clickedRoles++;
+      }
+      console.dir(clickedRoles);
+      
+      if (clickedRoles === 0) {  
+        canAct = false;
+        clickedObj.flipped = true;
+      }
+    } else if (clickedObj.role) {
+      let clickedRoles = 0;
+      for (let i = 0; i < unusedRoles.length; i++) {
+        if (unusedRoles[i].flipped) clickedRoles++;
+      }
+      
+      if (clickedRoles < 2) {
+        unusedRoles[unusedRoles.indexOf(clickedObj)].flipped = true;
+        clickedObj.flipped = true;
+        
+        clickedRoles++;
+        if (clickedRoles === 2) canAct = false;
+      }
     }
   }
   if (players[hash].startRole === 'Robber') {
@@ -514,6 +693,15 @@ const handleAction = (clickedObj) => {
       socket.emit('revealerFlip', { roomName, hash: pHash });
     }
   }
+};
+
+const handleVote = (clickedPlayer) => {
+  // You cannot vote for yourself
+  if (clickedPlayer.hash === hash) return;
+
+  canVote = false;
+  addScreenMessage({ message: `You have voted for ${clickedPlayer.name}` });
+  socket.emit('vote', { roomName, hash: clickedPlayer.hash });
 };
 
 const checkPlayerClick = (mX, mY) => {
@@ -545,38 +733,44 @@ const mouseClickHandler = (e) => {
   const mouseX = e.pageX - canvas.offsetLeft;
   const mouseY = e.pageY - canvas.offsetTop;
 
-  if (!inGame) {
-    if (mouseX >= 200 && mouseX <= 400) {
-      if (mouseY >= 200 && mouseY <= 340) {
-        inGame = true;
-        connect();
-      }
-    }
-  } else {
-    if (canAct) {
-      const clickedPlayer = checkPlayerClick(mouseX, mouseY);
-      if (clickedPlayer) handleAction(clickedPlayer);
-      const clickedRole = checkRoleClick(mouseX, mouseY);
-      if (clickedRole) handleAction(clickedRole);
-    }
-    
+  if (canAct) {
+    const clickedPlayer = checkPlayerClick(mouseX, mouseY);
+    if (clickedPlayer) handleAction(clickedPlayer);
+    const clickedRole = checkRoleClick(mouseX, mouseY);
+    if (clickedRole) handleAction(clickedRole);
+  } else if (canVote) {
+    const votedPlayer = checkPlayerClick(mouseX, mouseY);
+    if (votedPlayer.hash) handleVote(votedPlayer);
   }
 };
 
+const mouseDownHandler = (e) => {
+  const mouseX = e.pageX - canvas.offsetLeft;
+  const mouseY = e.pageY - canvas.offsetTop;
+
+  if (tokens.length > 0) {
+    for (let i = 0; i < tokens.length; i++) {
+      const token = tokens[i];
+      ctx.beginPath();
+      ctx.arc(token.x, token.y, 25, 0, Math.PI * 2);
+      ctx.closePath();
+      if (ctx.isPointInPath(mouseX, mouseY)) {
+        selectedToken = token;
+        return;
+      }
+    }
+  }
+};
+
+const mouseUpHandler = () => {
+  selectedToken = {};
+};
+
 const init = () => {
-  canvas = document.querySelector('#canvas');
-  ctx = canvas.getContext('2d');
-  chatCanvas = document.querySelector('#chatCanvas');
-  chatCtx = chatCanvas.getContext('2d');
+  createUsernameWindow();
 
   document.body.addEventListener('keydown', keyDownHandler);
   document.body.addEventListener('keypress', keyPressHandler);
-  // canvas.addEventListener('mousemove', mouseMoveHandler);
-  canvas.addEventListener('click', mouseClickHandler);
-  // chatCanvas.addEventListener('mousemove', mouseMoveHandler);
-  chatCanvas.addEventListener('click', mouseClickHandler);
-
-  requestAnimationFrame(redraw);
 };
 
 window.onload = init;

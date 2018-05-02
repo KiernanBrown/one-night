@@ -1,19 +1,24 @@
 {
-  "name": "rt-project3",
+  "name": "one-night",
   "version": "0.0.0",
-  "description": "Real Time Project 3",
+  "description": "Online version of One Night Ultimate Werewolf",
   "main": "./src/app.js",
   "scripts": {
     "start": "node ./src/app.js",
     "pretest": "eslint ./src --fix",
     "test": "echo \"Tests complete\"",
     "nodemon": "nodemon --watch ./src ./src/server.js",
-    "build": "babel ./client --out-file ./hosted/bundle.js",
-    "watch": "babel --watch ./client --out-file ./hosted/bundle.js"
+    "buildAppBundle": "babel ./client --presets react --out-file ./hosted/bundle.js",
+    "watchAppBundle": "babel --watch ./client --presets react --out-file ./hosted/bundle.js"
   },
   "author": "Kiernan Brown",
   "license": "ISC",
   "dependencies": {
+    "body-parser": "^1.18.2",
+    "compression": "^1.7.2",
+    "express": "^4.16.3",
+    "express-handlebars": "^3.0.0",
+    "helmet": "^3.12.0",
     "mongoose": "^5.0.12",
     "socket.io": "^2.0.4",
     "victor": "^1.1.0",
@@ -22,9 +27,11 @@
   "devDependencies": {
     "babel-cli": "^6.26.0",
     "babel-preset-env": "^1.6.1",
+    "babel-preset-react": "^6.24.1",
     "eslint": "^4.17.0",
     "eslint-config-airbnb": "^16.1.0",
     "eslint-plugin-import": "^2.8.0",
+    "materialize-css": "^0.100.2",
     "nodemon": "^1.14.12"
   }
 }
