@@ -19,9 +19,7 @@
     "express": "^4.16.3",
     "express-handlebars": "^3.0.0",
     "helmet": "^3.12.0",
-    "mongoose": "^5.0.12",
     "socket.io": "^2.0.4",
-    "victor": "^1.1.0",
     "xxhashjs": "^0.2.2"
   },
   "devDependencies": {
