@@ -255,7 +255,7 @@ const drawGame = (deltaTime) => {
   // Draw our timer
   ctx.font = '24px Helvetica';
   ctx.fillStyle = 'black';
-  ctx.fillText(`Timer: ${timer}`, 350 - (ctx.measureText(`Timer: ${timer}`).width / 2), 40);
+  ctx.fillText(`Timer: ${timer}`, 350 - (ctx.measureText(`Timer: ${timer}`).width / 2), 44);
 
   // Draw all the players in the game
   drawPlayers();
@@ -268,6 +268,11 @@ const drawGame = (deltaTime) => {
     for (let i = tokens.length - 1; i >= 0; i--) {
       drawToken(tokens[i]);
     }
+    
+    // Draw text under the tokens
+    ctx.fillStyle = 'black';
+    ctx.font = '16px Helvetica';
+    ctx.fillText('Moveable Role Tokens for information tracking', canvas.width / 2 - (ctx.measureText('Moveable Role Tokens for information tracking').width / 2), 176);
   }
 
   // Draw our sleepObj
@@ -541,6 +546,12 @@ const flipAll = (data) => {
   }
 };
 
+const flipUnused = (data) => {
+  for(let i = 0; i < unusedRoles.length; i++) {
+    unusedRoles[i].flipped = data.flipped;
+  }
+};
+
 const setStartRole = (data) => {
   const p = players[data.hash];
   p.startRole = data.role;
@@ -560,7 +571,7 @@ const setUnusedRoles = (data) => {
       role: roles[i],
       flipped: false,
       x,
-      y: 120,
+      y: 100,
     });
   }
 };
@@ -608,6 +619,8 @@ const connect = (playerSize) => {
   socket.on('flip', flip);
 
   socket.on('flipAll', flipAll);
+  
+  socket.on('flipUnused', flipUnused);
 
   socket.on('setStartRole', setStartRole);
 

@@ -270,7 +270,7 @@ var drawGame = function drawGame(deltaTime) {
   // Draw our timer
   ctx.font = '24px Helvetica';
   ctx.fillStyle = 'black';
-  ctx.fillText('Timer: ' + timer, 350 - ctx.measureText('Timer: ' + timer).width / 2, 40);
+  ctx.fillText('Timer: ' + timer, 350 - ctx.measureText('Timer: ' + timer).width / 2, 44);
 
   // Draw all the players in the game
   drawPlayers();
@@ -283,6 +283,11 @@ var drawGame = function drawGame(deltaTime) {
     for (var i = tokens.length - 1; i >= 0; i--) {
       drawToken(tokens[i]);
     }
+
+    // Draw text under the tokens
+    ctx.fillStyle = 'black';
+    ctx.font = '16px Helvetica';
+    ctx.fillText('Moveable Role Tokens for information tracking', canvas.width / 2 - ctx.measureText('Moveable Role Tokens for information tracking').width / 2, 176);
   }
 
   // Draw our sleepObj
@@ -567,6 +572,12 @@ var flipAll = function flipAll(data) {
   }
 };
 
+var flipUnused = function flipUnused(data) {
+  for (var i = 0; i < unusedRoles.length; i++) {
+    unusedRoles[i].flipped = data.flipped;
+  }
+};
+
 var setStartRole = function setStartRole(data) {
   var p = players[data.hash];
   p.startRole = data.role;
@@ -587,7 +598,7 @@ var setUnusedRoles = function setUnusedRoles(data) {
       role: roles[i],
       flipped: false,
       x: x,
-      y: 120
+      y: 100
     });
   }
 };
@@ -636,6 +647,8 @@ var connect = function connect(playerSize) {
 
   socket.on('flipAll', flipAll);
 
+  socket.on('flipUnused', flipUnused);
+
   socket.on('setStartRole', setStartRole);
 
   socket.on('setRole', setRole);
@@ -654,6 +667,9 @@ var connect = function connect(playerSize) {
 
   socket.on('canVote', function () {
     canVote = true;
+    setTimeout(function () {
+      canVote = false;
+    }, 10000);
   });
 
   socket.on('night', function () {

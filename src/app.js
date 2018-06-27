@@ -184,7 +184,7 @@ const endGame = (r) => {
   } else if (!werewolfKilled && room.usedRoles.includes('Werewolf')) {
     // Werewolves win if a werewolf was not killed, and there was a werewolf in the game
     // Werewolves lose if Tanner dies, so this is an else if
-    io.sockets.in(room.roomName).emit('addMessage', 'Server: All werewolves survived. The werewolevs win!');
+    io.sockets.in(room.roomName).emit('addMessage', 'Server: All werewolves survived. The werewolves win!');
   }
   if (werewolfKilled) {
     // Villagers win if a werewolf is killed
@@ -201,6 +201,7 @@ const endGame = (r) => {
 
   io.sockets.in(room.roomName).emit('screenMessage', { message: 'Game Over!', submessage: 'Please reconnect to play again', disappear: true });
   io.sockets.in(room.roomName).emit('flipAll', { flipped: true });
+  io.sockets.in(room.roomName).emit('flipUnused', { flipped: true });
 };
 
 const killPlayers = (r) => {
@@ -453,32 +454,6 @@ const startGame = (r) => {
   }, 10000);
 };
 
-/* const endGame = (r) => {
-  const room = r;
-  room.state = 'end';
-
-  // We want to get a collection of players on the winning team and update their wins
-  // Update our database based on the results of this game
-  // If a user has never won a game before, add them as an entry
-  // Otherwise, update the wins of the existing entry
-  Player.findOne({ name: winner.name }, (err, doc) => {
-    if (!doc) {
-      // Create a new player with 1 win
-      const playerData = {
-        name: winner.name,
-        wins: 1,
-      };
-
-      const newPlayer = new Player(playerData);
-      newPlayer.save();
-    } else {
-      // Update the existing player
-      const player = doc;
-      player.wins++;
-      player.save();
-    }
-  });
-}; */
 
 const onJoined = (sock) => {
   sock.on('join', (data) => {
