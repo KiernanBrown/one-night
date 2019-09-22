@@ -462,6 +462,7 @@ const onJoined = (sock) => {
     const room = getBestRoom(data.playerSize);
 
     socket.join(room.roomName);
+    socket.emit('addMessage', "Server: Press enter to start typing in chat. Press enter again to send your message (or dismiss if you haven't typed anything).");
 
     // Server itself doesn't care about height, width, prevX, and prevY (unless collisions)
     socket.hash = xxh.h32(`${socket.id}${new Date().getTime()}`, 0xDEADBEEF).toString(16);

@@ -1,0 +1,55 @@
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>One Night</title>
+  <script crossorigin src="https://unpkg.com/react@15/dist/react.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@15/dist/react-dom.min.js"></script>
+  <script crossorigin src="https://unpkg.com/prop-types/prop-types.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-core/5.8.34/browser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.2.0/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/remarkable/1.6.2/remarkable.min.js"></script>
+  <link rel="shortcut icon" href="/assets/img/favicon.png"/>
+  <link rel="stylesheet" type="text/css" href="/assets/materialize.min.css"/>
+  <link rel="stylesheet" type="text/css" href="/assets/style.css"/>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+<body>
+  <nav>
+    <div class="nav-wrapper">
+      <a href="#" class="brand-logo center">One Night</a>
+      <ul id="nav-mobile" class="right">
+        <li><a href="/main">Main</a></li>
+        <li><a href="/help">How To Play</a></li>
+        <li class="active"><a href="changelog">Changelog</a></li>
+      </ul>
+    </div>
+  </nav>
+  <section id="helpContent">
+    <h1>Changelog</h1>
+    <ul class ="collapsible">
+      <li class="active">
+        <div class="collapsible-header">Version 1.0.1 (9/22/19)</div>
+        <div class="collapsible-body">
+          <h3>Quality of Life and Cleanup</h3>
+          <p>Users now receive an informational chat message when joining a game explaining how the chat feature works.</p>
+          <p>Your role can now be viewed midgame by selecting the option on the right side of the chat. This can be toggled on and off and starts hidden.</p>
+          <p>Information on every role can now be viewed on the right side of the chat, underneath the player's role.</p>
+          <p>Removed references to unused pages.</p>
+        </div>
+      </li>
+      <li>
+        <div class="collapsible-header">Version 1.0.0 (6/27/19)</div>
+        <div class="collapsible-body">
+          <h3>Initial Release</h3>
+          <ul>
+            <p>Base game was created with the following roles: Werewolf, Villager, Mason, Seer, Robber, Insomniac, Revealer, and Tanner.</p>
+            <p>Users are automatically placed in rooms based on the number of players specified.</p>
+            <p>Players can chat using a built in text system.</p>
+            <p>The game functions and handles all role actions accordingly.</p>
+          </ul>
+        </div>
+      </li>
+    </ul>
+  </section>
+</body>
+</html>

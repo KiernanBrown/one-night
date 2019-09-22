@@ -6,14 +6,14 @@ const helpPage = (req, res) => {
   res.render('help');
 };
 
-const premiumPage = (req, res) => {
-  res.render('premium');
+const changelogPage = (req, res) => {
+  res.render('changelog');
 };
 
 const router = (app) => {
   app.get('/main', mainPage);
   app.get('/help', helpPage);
-  app.get('/premium', premiumPage);
+  app.get('/changelog', changelogPage);
   app.get('/', mainPage);
   app.get('/*', mainPage);
 };
