@@ -91,10 +91,42 @@ const GameCanvas = (props) => {
   );
 };
 
+const RoleInfo = (props) => {
+  return (
+    <div>
+      <h5>Team and Role Information</h5>
+      <ul>
+        <p>Werewolf Team: This team wins if all werewolves survive the vote at the end of the day.</p>
+        <ul>
+          <li>Werewolf (Wer): This role is part of the werewolf team. Werewolves wake up at the start of the night and are able to see the other werewolves on their team. If there is only one werewolf present in the game, the werewolf can look at one of the the 3 unused role cards. The werewolf team wins if all werewolves survive the vote at the end of the day. Lie, trick, and deceive the villagers to protect yourself and your teammates.</li>
+        </ul>
+        <p>Villager Team: This team wins if at least one werewolf is killed during the vote at the end of the day. If no werewolves are present, then the villager team wins if no players are killed during the vote.</p>
+        <ul>
+          <li>Villager (Vil): This role is part of the villager team. Villagers have no special action for their role.</li>
+          <li>Mason (Mas): This role is part of the villager team. There will always be 2 mason cards in the game if the mason role is being used. Masons wake up during the night and see who the other masons are. If you are the only mason who woke up, then the other mason card is one of the unused role cards.</li>
+          <li>The Seer (See): This role is part of the villager team. The Seer can choose to either view the role card of another player in the game, or to view up to 2 of the unused role cards in the game. Use the information you gain from your role action to steer your team in the right direction during your discussion.</li>
+          <li>The Robber (Rob): This role is part of the villager team. The Robber can choose to swap their role card with the role card of another player, and then look at your new role card. The card you steal becomes your new role, so you might need to switch up your playstyle depending on which role you stole.</li>
+          <li>The Insomniac (Ins): This role is part of the villager team. The Insomniac has trouble sleeping, and they wake up towards the end of the night to check their role card. This allows the insomniac to see if their role was changed during the night.</li>
+          <li>The Revealer (Rev): This role is part of the villager team. The Revealer can attempt to flip over the role card of another player, and that card will remain face up for the rest of the game. If the role card you attempt to flip is a Werewolf or Tanner, then you will be unable to flip the card.</li>
+        </ul>
+        <p>Third Parties: Third Party roles have their own goals and win conditions.</p>
+        <ul>
+          <li>The Tanner (Tan): The Tanner hates his job, and his only goal is to die. You win if you die during the vote at the end of the day.</li>
+        </ul>
+      </ul>
+    </div>
+  );
+};
+
 const createGameCanvas = () => {
   ReactDOM.render(
     <GameCanvas />,
     document.querySelector("#content")
+  );
+    
+  ReactDOM.render(
+    <RoleInfo />,
+    document.querySelector("#role-info")
   );
 };
 
